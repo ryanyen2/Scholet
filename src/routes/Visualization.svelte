@@ -4,6 +4,8 @@
   // import type { ScaleLinear } from "d3";
   import { browser } from "$app/environment";
   import PaperInfo from "./PaperInfo.svelte";
+  import HierarchicalViz from "./HierarchicalViz.svelte";
+
   import type { Data, SelectableColumn, FacultyType } from "../types/type.ts";
 
   let selectedColumn = "cluster" as SelectableColumn;
@@ -241,9 +243,10 @@
     };
 
     let xScale = d3.scaleLinear().domain([-1, 17]).range([0, width]);
-    let yScale = d3.scaleLinear().domain(
-      dataSource === "combined_df_pubdate" ? [-1, 13] : [-4.5, 10]
-    ).range([height, 0]);
+    let yScale = d3
+      .scaleLinear()
+      .domain(dataSource === "combined_df_pubdate" ? [-1, 13] : [-4.5, 10])
+      .range([height, 0]);
 
     // create svg and create a group inside that is moved by means of margin
     const svg = d3
@@ -439,8 +442,13 @@
       />
       <div id="vis" bind:this={vis}></div>
     </div>
-    <div>
-      <PaperInfo {filteredData} {selectedPaper} />
+    <div class="side_panel">
+      <div>
+        <PaperInfo {filteredData} {selectedPaper} />
+      </div>
+      <div>
+        <HierarchicalViz {selectedPaper} {data} />
+      </div>
     </div>
   </div>
 </main>
@@ -453,6 +461,13 @@
   .container {
     display: flex;
     flex-direction: row;
+    justify-content: space-between;
+    height: 100%;
+  }
+
+  .side_panel {
+    display: flex;
+    flex-direction: column;
     justify-content: space-between;
     height: 100%;
   }
