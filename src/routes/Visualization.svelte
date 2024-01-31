@@ -169,7 +169,7 @@
         "#c84b21", // arts
         "#606f00", // environment
       ])
-      .unknown("#ffffff") as any;
+      .unknown("#f5f5f5") as any;
 
     const tooltip = d3
       .select("#vis")
@@ -216,7 +216,9 @@
     };
 
     let xScale = d3.scaleLinear().domain([-1, 17]).range([0, width]);
-    let yScale = d3.scaleLinear().domain([-4.5, 10]).range([height, 0]);
+    let yScale = d3.scaleLinear().domain(
+      dataSource === "combined_df_pubdate" ? [-1, 13] : [-4.5, 10]
+    ).range([height, 0]);
 
     // create svg and create a group inside that is moved by means of margin
     const svg = d3
@@ -296,7 +298,11 @@
               d.department +
               "</td></tr>" +
               "<tr><td>Faculty:</td><td>" +
+              "<span style='color:" +
+              facultyColor(d.faculty) +
+              "'>" +
               d.faculty +
+              "</span>" +
               "</td></tr>" +
               // cluster with the color
               "<tr><td>Cluster:</td><td>" +
@@ -330,30 +336,38 @@
 
     svg.selectAll(".legend").remove();
 
-    // Get the unique values of the selected column
-    let values = Array.from(
-      new Set(
-        data.map((d) => {
-          // if = cluster, return top_keywords
-          if (selectedColumn === "cluster") {
-            console.log(d.cluster, d.top_keywords);
-            return d.top_keywords;
-          }
-          return d[selectedColumn];
+    let column_values = {} as Set<string> | Map<string, string>;
+    if (selectedColumn === "cluster") {
+      // Create a map with distinct keys (cluster) and values (top_keywords)
+      column_values = new Map(data.map((d) => [d.cluster, d.top_keywords]));
+    } else {
+      column_values = new Set(data.map((d) => d[selectedColumn]));
+    }
+
+    if (column_values instanceof Set) {
+      column_values = new Set(Array.from(column_values).sort());
+    } else {
+      column_values = new Map(
+        Array.from(column_values).sort((a, b) => {
+          return parseInt(a[0]) - parseInt(b[0]);
         })
-      )
-    );
+      );
+    }
 
     // Create the legend
     let legend = svg
       .selectAll(".legend")
-      .data(values)
+      .data(
+        selectedColumn === "faculty"
+          ? Array.from(column_values as Set<string>)
+          : Array.from(column_values as Map<string, string>, ([key, _]) => key)
+      )
       .enter()
       .append("g")
       .attr("class", "legend")
       .attr("transform", (d, i) => "translate(0," + i * 20 + ")");
 
-    // Add the colored rectangles
+    // colored rectangles
     legend
       .append("rect")
       .attr("x", 20)
@@ -368,7 +382,11 @@
       .attr("y", 9)
       .attr("dy", ".35em")
       .style("text-anchor", "start")
-      .text((d) => d);
+      .text((d: any) => {
+        return selectedColumn === "faculty"
+          ? d
+          : (column_values as Map<string, string>).get(d);
+      });
 
     initZoom();
   }
