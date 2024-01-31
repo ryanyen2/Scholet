@@ -10,9 +10,9 @@
 		<slot />
 	</main>
 
-	<footer>
-		<p>visit <a href="https://kit.svelte.dev">kit.svelte.dev</a> to learn SvelteKit</p>
-	</footer>
+	<!-- <footer>
+		<p>All rights reserved</p>
+	</footer> -->
 </div>
 
 <style>

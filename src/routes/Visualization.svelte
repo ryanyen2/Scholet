@@ -74,7 +74,7 @@
           .join(" ")
           .toLowerCase();
 
-        return searchableString.includes(lowerCaseSearchTerm) ? 1 : 0.1;
+        return searchableString.includes(lowerCaseSearchTerm) ? 1 : 0.5;
       })
       .attr("r", (d: any) => {
         let searchableString = [
@@ -91,6 +91,23 @@
           searchableString.includes(lowerCaseSearchTerm)
           ? 10
           : 4;
+      })
+      // add a stroke to the selected dot
+      .attr("stroke", (d: any) => {
+        let searchableString = [
+          d.title,
+          d.abstract,
+          d.first_name,
+          d.last_name,
+          d.department,
+        ]
+          .join(" ")
+          .toLowerCase();
+
+        return lowerCaseSearchTerm.length > 1 &&
+          searchableString.includes(lowerCaseSearchTerm)
+          ? "black"
+          : "none";
       });
 
     if (lowerCaseSearchTerm.length > 1) {
@@ -188,6 +205,10 @@
       // const selected_cluster = d.cluster as string;
       const selected_column = d[selectedColumn] as string;
 
+      if (searchTerm.length > 1) {
+        return;
+      }
+
       d3.selectAll(".dot").transition().duration(100).attr("r", 3);
       // .style("fill", "lightgrey");
 
@@ -204,6 +225,10 @@
     }
 
     const doNotHighlight = function (d: Data) {
+      if (searchTerm.length > 1) {
+        return;
+      }
+
       d3.selectAll(".dot")
         .transition()
         .duration(100)
@@ -327,9 +352,10 @@
         d3.select(this)
           .transition()
           .duration(100)
-          .attr("r", 4)
-          .attr("stroke-width", 0)
-          .attr("stroke", "none");
+          // if it's in the filteredData, then it should be highlighted
+          .attr("r", filteredData.includes(d) ? 10 : 4)
+          .attr("stroke-width", filteredData.includes(d) ? 2 : 0)
+          .attr("stroke", filteredData.includes(d) ? "black" : "none");
 
         tooltip.style("display", "none").style("opacity", 0);
       });

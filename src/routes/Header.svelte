@@ -5,11 +5,11 @@
 </script>
 
 <header>
-	<div class="corner">
+	<!-- <div class="corner">
 		<a href="https://kit.svelte.dev">
 			<img src={logo} alt="SvelteKit" />
 		</a>
-	</div>
+	</div> -->
 
 	<nav>
 		<svg viewBox="0 0 2 3" aria-hidden="true">
@@ -32,7 +32,7 @@
 	</nav>
 
 	<div class="corner">
-		<a href="https://github.com/sveltejs/kit">
+		<a href="https://github.com/ryanyen2/waterloo-ai-institute">
 			<img src={github} alt="GitHub" />
 		</a>
 	</div>
