@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
   import * as d3 from "d3";
   // import type { ScaleLinear } from "d3";
-  // import { browser } from "svelte/internal"
+  import { browser } from "$app/environment";
 
   type Data = {
     x: number;
@@ -42,12 +42,13 @@
   // load data for visualization from local csv file
   let data = [] as Data[];
   // d3.csv(`http://localhost:5173/${dataSource}.csv`).then(function (d) {
-    
+
   //   // redraw();
   // });
 
   async function loadData() {
-    let url = `http://localhost:5173/${dataSource}.csv`;
+    // let url = `http://localhost:5173/${dataSource}.csv`;
+    let url = `https://raw.githubusercontent.com/ryanyen2/waterloo-ai-institute/main/static/${dataSource}.csv`;
     let d = await d3.csv(url);
     data = [];
     d.forEach(function (d) {
@@ -77,13 +78,14 @@
     width = 920 - margin.left - margin.right,
     height = 800 - margin.top - margin.bottom;
 
-  onMount(() => {
-    setTimeout(() => {
-      loadData();
-      redraw();
-    }, 1000);
+  if (browser) {
     window.addEventListener("resize", redraw);
-  });
+    onMount(() => {
+      loadData();
+      setTimeout(redraw, 300);
+      window.addEventListener("resize", redraw);
+    });
+  }
 
   function highlightSearchResults() {
     // Lowercase the search term for case-insensitive search
@@ -126,9 +128,9 @@
       });
   }
 
-  $: dataSource, loadData(), redraw();
-  $: if (data.length > 0) selectedColumn, redraw();
-  $: if (data.length > 0) searchTerm, highlightSearchResults();
+  $: if (browser) dataSource, loadData(), redraw();
+  $: if (browser && data.length > 0) selectedColumn, redraw();
+  $: if (browser && data.length > 0) searchTerm, highlightSearchResults();
 
   let zoom = d3.zoom().on("zoom", handleZoom) as any;
 
@@ -191,6 +193,7 @@
       .select("#vis")
       .append("div")
       .style("opacity", 0)
+      .style("display", "none")
       .attr("class", "tooltip")
       .style("position", "absolute")
       .style("background-color", "white")
@@ -274,7 +277,7 @@
       .style("fill-opacity", "0.75")
       .on("mouseover", function (event, d) {
         highlight(d);
-        tooltip.style("opacity", 1);
+        tooltip.style("display", "block").style("opacity", 1);
       })
       .on("mousemove", function (event, d) {
         // enlarge that dot
@@ -322,6 +325,7 @@
               "</td></tr>" +
               "</table>"
           )
+          .style("display", "block")
           .style("opacity", 1)
           .style("left", event.pageX + 10 + "px")
           .style("top", event.pageY + 10 + "px");
@@ -336,7 +340,7 @@
           .attr("stroke-width", 0)
           .attr("stroke", "none");
 
-        tooltip.style("opacity", 0);
+        tooltip.style("display", "none").style("opacity", 0);
       });
 
     svg.selectAll(".legend").remove();
