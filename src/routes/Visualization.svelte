@@ -3,56 +3,28 @@
   import * as d3 from "d3";
   // import type { ScaleLinear } from "d3";
   import { browser } from "$app/environment";
-
-  type Data = {
-    x: number;
-    y: number;
-    cluster: string;
-    title: string;
-    abstract: string;
-    department: string;
-    department_broad: string;
-    focus_tag: string;
-    focus_label: string;
-    top_keywords: string;
-    last_name: string;
-    first_name: string;
-    email: string;
-    faculty: string;
-    area_of_focus: string;
-    gs_link: string;
-    author_id: string;
-  };
-  type SelectableColumn = "cluster" | "faculty" | "department" | "focus_tag";
-  type FacultyType =
-    | "Engineering"
-    | "Mathematics"
-    | "Science"
-    | "Health"
-    | "Arts"
-    | "Environment"
-    | "Healh"
-    | "";
+  import PaperInfo from "./PaperInfo.svelte";
+  import type { Data, SelectableColumn, FacultyType } from "../types/type.ts";
 
   let selectedColumn = "cluster" as SelectableColumn;
   let vis = null as any;
   let searchTerm = "" as string;
   let dataSource = "combined_df";
 
-  // load data for visualization from local csv file
   let data = [] as Data[];
+  let filteredData = [] as Data[];
+  let selectedPaper = null as Data | null;
+
   // d3.csv(`http://localhost:5173/${dataSource}.csv`).then(function (d) {
-
-  //   // redraw();
-  // });
-
   async function loadData() {
     // let url = `http://localhost:5173/${dataSource}.csv`;
     let url = `https://raw.githubusercontent.com/ryanyen2/waterloo-ai-institute/main/static/${dataSource}.csv`;
     let d = await d3.csv(url);
     data = [];
+    let index = 0;
     d.forEach(function (d) {
       data.push({
+        paper_id: index++ + "",
         x: +d.umap_x * 1.1,
         y: +d.umap_y * 1.1,
         cluster: d.cluster,
@@ -88,13 +60,10 @@
   }
 
   function highlightSearchResults() {
-    // Lowercase the search term for case-insensitive search
     let lowerCaseSearchTerm = searchTerm.toLowerCase();
 
-    // Select all dots and set their opacity based on whether they match the search term
     d3.selectAll(".dot")
       .style("opacity", (d: any) => {
-        // Concatenate the values of the searchable fields into a single string
         let searchableString = [
           d.title,
           d.abstract,
@@ -105,11 +74,9 @@
           .join(" ")
           .toLowerCase();
 
-        // If the searchable string includes the search term, return full opacity; otherwise, return low opacity
         return searchableString.includes(lowerCaseSearchTerm) ? 1 : 0.1;
       })
       .attr("r", (d: any) => {
-        // Concatenate the values of the searchable fields into a single string
         let searchableString = [
           d.title,
           d.abstract,
@@ -120,12 +87,27 @@
           .join(" ")
           .toLowerCase();
 
-        // If the searchable string includes the search term, return enlarged radius; otherwise, return normal radius
         return lowerCaseSearchTerm.length > 1 &&
           searchableString.includes(lowerCaseSearchTerm)
           ? 10
           : 4;
       });
+
+    if (lowerCaseSearchTerm.length > 1) {
+      filteredData = data.filter((d: any) => {
+        let searchableString = [
+          d.title,
+          d.abstract,
+          d.first_name,
+          d.last_name,
+          d.department,
+        ]
+          .join(" ")
+          .toLowerCase();
+
+        return searchableString.includes(lowerCaseSearchTerm);
+      });
+    }
   }
 
   $: if (browser) dataSource, loadData(), redraw();
@@ -275,6 +257,9 @@
           : color(d[selectedColumn])
       )
       .style("fill-opacity", "0.75")
+      .on("click", function (event, d) {
+        selectedPaper = d;
+      })
       .on("mouseover", function (event, d) {
         highlight(d);
         tooltip.style("display", "block").style("opacity", 1);
@@ -351,6 +336,7 @@
         data.map((d) => {
           // if = cluster, return top_keywords
           if (selectedColumn === "cluster") {
+            console.log(d.cluster, d.top_keywords);
             return d.top_keywords;
           }
           return d[selectedColumn];
@@ -389,35 +375,47 @@
 </script>
 
 <main>
-  <select bind:value={dataSource}>
-    <option value="combined_df">Combined Data</option>
-    <option value="combined_df_pubdate">Most Recent Data</option>
-  </select>
-  <select bind:value={selectedColumn}>
-    <option value="cluster">Cluster</option>
-    <option value="faculty">Faculty</option>
-    <!-- disable the following two -->
-    <option value="department" disabled>Department</option>
-    <option value="focus_tag" disabled>Focus Tag</option>
-  </select>
-  <input
-    type="text"
-    bind:value={searchTerm}
-    placeholder="Search Name, Paper, Department..."
-  />
-  <div id="vis" bind:this={vis}></div>
+  <div class="container">
+    <div>
+      <select bind:value={dataSource}>
+        <option value="combined_df">Combined Data</option>
+        <option value="combined_df_pubdate">Most Recent Data</option>
+      </select>
+      <select bind:value={selectedColumn}>
+        <option value="cluster">Cluster</option>
+        <option value="faculty">Faculty</option>
+        <!-- disable the following two -->
+        <option value="department" disabled>Department</option>
+        <option value="focus_tag" disabled>Focus Tag</option>
+      </select>
+      <input
+        type="text"
+        bind:value={searchTerm}
+        placeholder="Search Name, Paper, Department..."
+      />
+      <div id="vis" bind:this={vis}></div>
+    </div>
+    <div>
+      <PaperInfo {filteredData} {selectedPaper} />
+    </div>
+  </div>
 </main>
 
 <style>
   main {
-    /* height: 80vh; */
     height: 100%;
-    /* display: flex; */
+  }
+
+  .container {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    height: 100%;
   }
 
   #vis {
     width: 100%;
-    height: 100%;
+    /* height: 100%; */
     background-color: #f5f5f5;
   }
 
