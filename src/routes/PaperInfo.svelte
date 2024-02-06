@@ -5,6 +5,7 @@
   export let filteredData: Data[];
   export let selectedPaper: Data | null;
 
+
   let rowRefs = [] as HTMLTableRowElement[];
 
 
