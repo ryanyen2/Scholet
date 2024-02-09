@@ -1,3 +1,11 @@
+<!-- 
+  === DESCRIPTION of the file ===
+  This file is a svelte component that creates a table.
+  It takes in a selectedPaper and filteredData as props.
+  The selectedPaper is the paper that the user has clicked on and the filteredData is the list of papers.
+  The table shows the list of papers and highlights the selectedPaper.
+-->
+
 <script lang="ts">
   import type { Data } from "../types/type.ts";
 

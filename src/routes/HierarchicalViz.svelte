@@ -1,3 +1,11 @@
+<!-- 
+  === DESCRIPTION of the file ===
+  This file is a svelte component that creates a radial bar chart. 
+  It takes in a selectedPaper and data as props. 
+  The selectedPaper is the paper that the user has clicked on and the data is the list of papers. 
+  The chart shows the number of papers written by each author in the same cluster as the selectedPaper. 
+  The chart is created using the redraw function which is called when the selectedPaper or data changes. 
+-->
 <script lang="ts">
   import { onMount } from "svelte";
   import { browser } from "$app/environment";
@@ -55,12 +63,15 @@
       (d) => d.cluster === selectedCluster
     ) as { cluster: string; count: Array<[string, number]> };
 
-    // filter all < 2
-    selectedClusterData.count = selectedClusterData.count.filter(
+    if (!selectedClusterData) {
+      return;
+    }
+
+    selectedClusterData.count = selectedClusterData?.count.filter(
       (d) => d[1] > 2
     );
 
-    selectedClusterData.count = selectedClusterData.count.sort(
+    selectedClusterData.count = selectedClusterData?.count.sort(
       (a, b) => b[1] - a[1]
     );
 

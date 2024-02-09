@@ -1,3 +1,16 @@
+<!-- 
+  === DESCRIPTION of the file ===
+  This file is a svelte component that creates a scatter plot.
+  It takes in a selectedColumn, vis, searchTerm, dataSource, data, and filteredData as props.
+  The selectedColumn is the column that the user has selected to color the dots by.
+  The vis is the div that the scatter plot will be drawn in.
+  The searchTerm is the string that the user has entered to search for papers.
+  The dataSource is the source of the data.
+  The data is the list of papers.
+  The filteredData is the list of papers that match the searchTerm.
+  The chart is created using the redraw function which is called when the selectedColumn, vis, searchTerm, dataSource, or data changes.
+-->
+
 <script lang="ts">
   import { onMount } from "svelte";
   import * as d3 from "d3";
@@ -339,7 +352,7 @@
               "'>" +
               d.cluster +
               "\t" +
-              d.top_keywords +
+              d.top_keywords?.split(",").slice(0, 5).join(", ") +
               "</span>" +
               "</td></tr>" +
               "</table>"
@@ -367,8 +380,12 @@
 
     let column_values = {} as Set<string> | Map<string, string>;
     if (selectedColumn === "cluster") {
-      // Create a map with distinct keys (cluster) and values (top_keywords)
-      column_values = new Map(data.map((d) => [d.cluster, d.top_keywords]));
+      // only show the top 5 keywords, remove all double quotes
+
+      column_values = new Map(
+        data.map((d) => [d.cluster, d.top_keywords.split(",").slice(0, 5).join(", ").replace(/"/g, "")])
+      );
+      // column_values = new Map(data.map((d) => [d.cluster, d.top_keywords]));
     } else {
       column_values = new Set(data.map((d) => d[selectedColumn]));
     }
