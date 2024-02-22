@@ -12,7 +12,7 @@
   import * as d3 from "d3";
   import type { Data } from "../types/type.ts";
 
-  export let selectedPaper: Data | null;
+  export let selectedPaper: Data;
   export let data: Data[];
 
   // Color scale based on 'cluster' column, 10 colors

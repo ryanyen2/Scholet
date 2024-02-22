@@ -28,7 +28,8 @@
 
   let data = [] as Data[];
   let filteredData = [] as Data[];
-  let selectedPaper = null as Data | null;
+  let selectedPaper: Data;
+  let topTenPapers = [] as Data[];
 
   // d3.csv(`http://localhost:5173/${dataSource}.csv`).then(function (d) {
   async function loadData() {
@@ -57,6 +58,7 @@
         area_of_focus: d.area_of_focus,
         gs_link: d.gs_link,
         author_id: d.author_id,
+        distance: 0,
       });
     });
   }
@@ -234,7 +236,7 @@
           "fill",
           selectedColumn === "faculty"
             ? facultyColor(selected_column as FacultyType)
-            : color(selected_column)
+            : color(selected_column),
         )
         .attr("r", 6);
     }
@@ -250,7 +252,7 @@
         .style("fill", (d: any) =>
           selectedColumn === "faculty"
             ? facultyColor(d[selectedColumn] as FacultyType)
-            : color(d[selectedColumn])
+            : color(d[selectedColumn]),
         )
         .attr("r", 4);
     };
@@ -297,24 +299,91 @@
       .style("fill", (d) =>
         selectedColumn === "faculty"
           ? facultyColor(d[selectedColumn] as FacultyType)
-          : color(d[selectedColumn])
+          : color(d[selectedColumn]),
       )
       .style("fill-opacity", "0.75")
       .on("click", function (event, d) {
         selectedPaper = d;
+        let x = selectedPaper.x;
+        let y = selectedPaper.y;
+        data.forEach((d) => {
+          d.distance = Math.pow(d.x - x, 2) + Math.pow(d.y - y, 2);
+        });
+        // improve using min-heap
+        data.sort((a, b) => a.distance - b.distance);
+        topTenPapers = data.slice(1, 11);
+
+        const dataLinks = topTenPapers.map((p) => ({
+          source: selectedPaper,
+          target: p,
+        }));
+        svg.selectAll("line").remove();
+        svg
+          .append("g")
+          .selectAll("line")
+          .data(dataLinks)
+          .enter()
+          .append("line")
+          .attr("x1", function (d) {
+            return xScale(d.source.x);
+          })
+          .attr("y1", function (d) {
+            return yScale(d.source.y);
+          })
+          .attr("x2", function (d) {
+            return xScale(d.target.x) - Math.cos(angle(d.source, d.target)) * 4;
+          })
+          .attr("y2", function (d) {
+            return yScale(d.target.y) + Math.sin(angle(d.source, d.target)) * 4;
+          })
+          .style("stroke", "black")
+          .style("stroke-width", 0.5);
+
+        function angle(source: Data, target: Data) {
+          return Math.atan2(target.y - source.y, target.x - source.x);
+        }
+
+        d3.selectAll(".dot")
+          .transition()
+          .duration(100)
+          .attr("stroke", (d: any) =>
+            topTenPapers.includes(d) ? "black" : "none",
+          )
+          .attr("stroke-width", (d: any) =>
+            topTenPapers.includes(d) ? 0.5 : 0,
+          );
       })
       .on("mouseover", function (event, d) {
         highlight(d);
-        tooltip.style("display", "block").style("opacity", 1);
-      })
-      .on("mousemove", function (event, d) {
-        // enlarge that dot
+        d3.selectAll(".dot")
+          .transition()
+          .duration(100)
+          .attr("r", (dot: any) => filteredData.includes(dot) ? 10 : 4)
+          .attr("stroke-width", (dot: any) => {
+            if (filteredData.includes(dot)) {
+              return 2;
+            } else if (topTenPapers.includes(dot)) {
+              return 0.5;
+            } else {
+              return 0;
+            }
+          })
+          .attr(
+            "stroke",
+            (dot: any) => filteredData.includes(dot) || topTenPapers.includes(dot)
+              ? "black"
+              : "none",
+          );
+
         d3.select(this)
           .transition()
           .duration(100)
           .attr("r", 12)
           .attr("stroke-width", 2)
           .attr("stroke", "black");
+        tooltip.style("display", "block").style("opacity", 1);
+      })
+      .on("mousemove", function (event, d) {
 
         tooltip
           .html(
@@ -355,7 +424,7 @@
               d.top_keywords?.split(",").slice(0, 5).join(", ") +
               "</span>" +
               "</td></tr>" +
-              "</table>"
+              "</table>",
           )
           .style("display", "block")
           .style("opacity", 1)
@@ -363,15 +432,28 @@
           .style("top", event.pageY + 10 + "px");
       })
       .on("mouseleave", function (event, d) {
+        console.log("leave" + JSON.stringify(d))
         doNotHighlight(d);
-
         d3.select(this)
           .transition()
           .duration(100)
           // if it's in the filteredData, then it should be highlighted
           .attr("r", filteredData.includes(d) ? 10 : 4)
-          .attr("stroke-width", filteredData.includes(d) ? 2 : 0)
-          .attr("stroke", filteredData.includes(d) ? "black" : "none");
+          .attr("stroke-width", (d: any) => {
+            if (filteredData.includes(d)) {
+              return 2;
+            } else if (topTenPapers.includes(d)) {
+              return 0.5;
+            } else {
+              return 0;
+            }
+          })
+          .attr(
+            "stroke",
+            filteredData.includes(d) || topTenPapers.includes(d)
+              ? "black"
+              : "none",
+          );
 
         tooltip.style("display", "none").style("opacity", 0);
       });
@@ -383,7 +465,10 @@
       // only show the top 5 keywords, remove all double quotes
 
       column_values = new Map(
-        data.map((d) => [d.cluster, d.top_keywords.split(",").slice(0, 5).join(", ").replace(/"/g, "")])
+        data.map((d) => [
+          d.cluster,
+          d.top_keywords.split(",").slice(0, 5).join(", ").replace(/"/g, ""),
+        ]),
       );
       // column_values = new Map(data.map((d) => [d.cluster, d.top_keywords]));
     } else {
@@ -396,7 +481,7 @@
       column_values = new Map(
         Array.from(column_values).sort((a, b) => {
           return parseInt(a[0]) - parseInt(b[0]);
-        })
+        }),
       );
     }
 
@@ -406,7 +491,7 @@
       .data(
         selectedColumn === "faculty"
           ? Array.from(column_values as Set<string>)
-          : Array.from(column_values as Map<string, string>, ([key, _]) => key)
+          : Array.from(column_values as Map<string, string>, ([key, _]) => key),
       )
       .enter()
       .append("g")
