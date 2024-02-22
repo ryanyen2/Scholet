@@ -242,7 +242,7 @@
     }
 
     const doNotHighlight = function (d: Data) {
-      if (searchTerm.length > 1) {
+      if (searchTerm.length > 1 || topTenPapers.length > 0) {
         return;
       }
 
@@ -304,19 +304,26 @@
       .style("fill-opacity", "0.75")
       .on("click", function (event, d) {
         selectedPaper = d;
+
+        // search for 10 top related using Euclidean distance
         let x = selectedPaper.x;
         let y = selectedPaper.y;
         data.forEach((d) => {
           d.distance = Math.pow(d.x - x, 2) + Math.pow(d.y - y, 2);
         });
-        // improve using min-heap
         data.sort((a, b) => a.distance - b.distance);
         topTenPapers = data.slice(1, 11);
 
+        // Add links between selected and its ten related papers
         const dataLinks = topTenPapers.map((p) => ({
           source: selectedPaper,
           target: p,
         }));
+
+        function angle(source: Data, target: Data) {
+          return Math.atan2(target.y - source.y, target.x - source.x);
+        }
+
         svg.selectAll("line").remove();
         svg
           .append("g")
@@ -331,17 +338,13 @@
             return yScale(d.source.y);
           })
           .attr("x2", function (d) {
-            return xScale(d.target.x) - Math.cos(angle(d.source, d.target)) * 4;
+            return xScale(d.target.x) - Math.cos(angle(d.source, d.target)) * 10;
           })
           .attr("y2", function (d) {
-            return yScale(d.target.y) + Math.sin(angle(d.source, d.target)) * 4;
+            return yScale(d.target.y) + Math.sin(angle(d.source, d.target)) * 10;
           })
           .style("stroke", "black")
-          .style("stroke-width", 0.5);
-
-        function angle(source: Data, target: Data) {
-          return Math.atan2(target.y - source.y, target.x - source.x);
-        }
+          .style("stroke-width", 0.75);
 
         d3.selectAll(".dot")
           .transition()
@@ -350,24 +353,18 @@
             topTenPapers.includes(d) ? "black" : "none",
           )
           .attr("stroke-width", (d: any) =>
-            topTenPapers.includes(d) ? 0.5 : 0,
-          );
+            topTenPapers.includes(d) ? 2 : 0,
+          )
+          .attr("r", (d: any) =>
+            topTenPapers.includes(d) ? 10 : 4,);
       })
       .on("mouseover", function (event, d) {
         highlight(d);
         d3.selectAll(".dot")
           .transition()
           .duration(100)
-          .attr("r", (dot: any) => filteredData.includes(dot) ? 10 : 4)
-          .attr("stroke-width", (dot: any) => {
-            if (filteredData.includes(dot)) {
-              return 2;
-            } else if (topTenPapers.includes(dot)) {
-              return 0.5;
-            } else {
-              return 0;
-            }
-          })
+          .attr("r", (dot: any) => filteredData.includes(dot) || topTenPapers.includes(dot) ? 10 : 4)
+          .attr("stroke-width", (dot: any) => filteredData.includes(dot) || topTenPapers.includes(dot) ? 2 : 0)
           .attr(
             "stroke",
             (dot: any) => filteredData.includes(dot) || topTenPapers.includes(dot)
@@ -438,16 +435,8 @@
           .transition()
           .duration(100)
           // if it's in the filteredData, then it should be highlighted
-          .attr("r", filteredData.includes(d) ? 10 : 4)
-          .attr("stroke-width", (d: any) => {
-            if (filteredData.includes(d)) {
-              return 2;
-            } else if (topTenPapers.includes(d)) {
-              return 0.5;
-            } else {
-              return 0;
-            }
-          })
+          .attr("r", filteredData.includes(d) || topTenPapers.includes(d) ? 10 : 4)
+          .attr("stroke-width", (d: any) => filteredData.includes(d) || topTenPapers.includes(d) ? 2 : 0)
           .attr(
             "stroke",
             filteredData.includes(d) || topTenPapers.includes(d)
