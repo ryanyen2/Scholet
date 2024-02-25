@@ -17,7 +17,8 @@ export type Data = {
     area_of_focus: string;
     gs_link: string;
     author_id: string;
-    distance: number;
+    embeddings: number[];
+    cosine_similarity: number;
 };
 
 export type SelectableColumn = "cluster" | "faculty" | "department" | "focus_tag";
