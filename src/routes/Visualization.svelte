@@ -408,6 +408,10 @@
       })
       .on("mouseover", function (event, d) {
         highlight(d);
+        tooltip.style("display", "block").style("opacity", 1);
+      })
+      .on("mousemove", function (event, d) {
+        // enlarge that dot
         d3.selectAll(".dot")
           .transition()
           .duration(100)
@@ -429,9 +433,7 @@
           .attr("r", 12)
           .attr("stroke-width", 2)
           .attr("stroke", "black");
-        tooltip.style("display", "block").style("opacity", 1);
-      })
-      .on("mousemove", function (event, d) {
+
         tooltip
           .html(
             "<b>" +
