@@ -1,23 +1,24 @@
 <script>
-	// import Counter from './Counter.svelte';
-	import Visualization from './Visualization.svelte';
+  // import Counter from './Counter.svelte';
+  // import Visualization from './Visualization.svelte';
+  import LatentSpace from "./LatentSpace.svelte";
+  // import Chat from "./Chat.svelte";
 </script>
 
 <svelte:head>
-	<title>Home</title>
-	<meta name="description" content="Svelte demo app" />
+  <title>Home</title>
+  <meta name="description" content="AI Institute in Waterloo" />
 </svelte:head>
 
 <section>
-	<Visualization />
+  <LatentSpace />
 </section>
 
 <style>
-	section {
-		display: flex;
-		flex-direction: column;
-		justify-content: center;
-		align-items: center;
-		flex: 0.6;
-	}
+  /* section {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: stretch;
+  } */
 </style>
