@@ -11,7 +11,7 @@
 
   //   filteredData, selectedPaper are props from parent
   export let filteredData: Data[];
-  export let selectedPaper: Data | null;
+  export let selectedPaper: Data;
 
 
   let rowRefs = [] as HTMLTableRowElement[];
