@@ -28,7 +28,8 @@
 
   let data = [] as Data[];
   let filteredData = [] as Data[];
-  let selectedPaper = null as Data | null;
+  let selectedPaper: Data;
+  let topTenPapers = [] as Data[];
 
   // d3.csv(`http://localhost:5173/${dataSource}.csv`).then(function (d) {
   async function loadData() {
@@ -57,6 +58,8 @@
         area_of_focus: d.area_of_focus,
         gs_link: d.gs_link,
         author_id: d.author_id,
+        embeddings: JSON.parse(d.embeddings).map(Number),
+        cosine_similarity: 0,
       });
     });
   }
@@ -140,6 +143,19 @@
         return searchableString.includes(lowerCaseSearchTerm);
       });
     }
+  }
+
+  function cosineSimilarity(vector1: number[], vector2: number[]) {
+    const dotProduct = vector1.reduce(
+      (acc, val, i) => acc + val * vector2[i],
+      0,
+    );
+    const mag1 = Math.sqrt(vector1.reduce((acc, val) => acc + val * val, 0));
+    const mag2 = Math.sqrt(vector2.reduce((acc, val) => acc + val * val, 0));
+    if (mag1 === 0 || mag2 === 0) {
+      return 0;
+    }
+    return dotProduct / (mag1 * mag2);
   }
 
   $: if (browser) dataSource, loadData(), redraw();
@@ -234,13 +250,13 @@
           "fill",
           selectedColumn === "faculty"
             ? facultyColor(selected_column as FacultyType)
-            : color(selected_column)
+            : color(selected_column),
         )
         .attr("r", 6);
     }
 
     const doNotHighlight = function (d: Data) {
-      if (searchTerm.length > 1) {
+      if (searchTerm.length > 1 || topTenPapers.length > 0) {
         return;
       }
 
@@ -250,7 +266,7 @@
         .style("fill", (d: any) =>
           selectedColumn === "faculty"
             ? facultyColor(d[selectedColumn] as FacultyType)
-            : color(d[selectedColumn])
+            : color(d[selectedColumn]),
         )
         .attr("r", 4);
     };
@@ -297,11 +313,98 @@
       .style("fill", (d) =>
         selectedColumn === "faculty"
           ? facultyColor(d[selectedColumn] as FacultyType)
-          : color(d[selectedColumn])
+          : color(d[selectedColumn]),
       )
       .style("fill-opacity", "0.75")
       .on("click", function (event, d) {
+        if (d === selectedPaper) return;
         selectedPaper = d;
+        // search for 10 top related using Euclidean distance
+        data.forEach((d) => {
+          d.cosine_similarity = cosineSimilarity(
+            selectedPaper.embeddings,
+            d.embeddings,
+          );
+        });
+        data.sort((a, b) => b.cosine_similarity - a.cosine_similarity);
+        topTenPapers = data.slice(0, 11);
+
+        // Add links between selected and its ten related papers
+        const dataLinks = [];
+
+        for (let p of topTenPapers) {
+          if (p.paper_id !== selectedPaper.paper_id) {
+            dataLinks.push({
+              source: selectedPaper.paper_id,
+              target: p.paper_id,
+            });
+          }
+        }
+
+        function angle(source: Data, target: Data) {
+          return Math.atan2(target.y - source.y, target.x - source.x);
+        }
+
+        svg.selectAll("line").remove();
+
+        var link = svg
+          .selectAll("line")
+          .data(dataLinks)
+          .enter()
+          .append("line")
+          .style("stroke", "black")
+          .style("stroke-width", 0.75);
+
+        var node = svg
+          .selectAll("circle")
+          .filter((d: any) => topTenPapers.includes(d));
+
+        node
+          .transition()
+          .duration(100)
+          .attr("stroke", (d: any) =>
+            topTenPapers.includes(d) ? "black" : "none",
+          )
+          .attr("stroke-width", (d: any) => (topTenPapers.includes(d) ? 2 : 0))
+          .attr("r", (d: any) => (topTenPapers.includes(d) ? 10 : 4));
+
+        const simulation = d3
+          .forceSimulation(topTenPapers)
+          .force("charge", d3.forceManyBody().strength(-0.001))
+          .force(
+            "link",
+            d3
+              .forceLink(dataLinks)
+              .strength(0)
+              .iterations(10)
+              .id(function (d: any) {
+                return d.paper_id;
+              }),
+          )
+          .on("tick", ticked);
+
+        function ticked() {
+          link
+            .attr("x1", function (d: any) {
+              return xScale(d.source.x)  + Math.cos(angle(d.source, d.target)) * 10;
+            })
+            .attr("y1", function (d: any) {
+              return yScale(d.source.y) - Math.sin(angle(d.source, d.target)) * 10;
+            })
+            .attr("x2", function (d: any) {
+              return xScale(d.target.x) - Math.cos(angle(d.source, d.target)) * 10;
+            })
+            .attr("y2", function (d: any) {
+              return yScale(d.target.y) + Math.sin(angle(d.source, d.target)) * 10;
+            });
+          node
+            .attr("cx", function (d: any) {
+              return xScale(d.x);
+            })
+            .attr("cy", function (d: any) {
+              return yScale(d.y);
+            });
+        }
       })
       .on("mouseover", function (event, d) {
         highlight(d);
@@ -309,6 +412,21 @@
       })
       .on("mousemove", function (event, d) {
         // enlarge that dot
+        d3.selectAll(".dot")
+          .transition()
+          .duration(100)
+          .attr("r", (dot: any) =>
+            filteredData.includes(dot) || topTenPapers.includes(dot) ? 10 : 4,
+          )
+          .attr("stroke-width", (dot: any) =>
+            filteredData.includes(dot) || topTenPapers.includes(dot) ? 2 : 0,
+          )
+          .attr("stroke", (dot: any) =>
+            filteredData.includes(dot) || topTenPapers.includes(dot)
+              ? "black"
+              : "none",
+          );
+
         d3.select(this)
           .transition()
           .duration(100)
@@ -355,7 +473,7 @@
               d.top_keywords?.split(",").slice(0, 5).join(", ") +
               "</span>" +
               "</td></tr>" +
-              "</table>"
+              "</table>",
           )
           .style("display", "block")
           .style("opacity", 1)
@@ -364,14 +482,23 @@
       })
       .on("mouseleave", function (event, d) {
         doNotHighlight(d);
-
         d3.select(this)
           .transition()
           .duration(100)
           // if it's in the filteredData, then it should be highlighted
-          .attr("r", filteredData.includes(d) ? 10 : 4)
-          .attr("stroke-width", filteredData.includes(d) ? 2 : 0)
-          .attr("stroke", filteredData.includes(d) ? "black" : "none");
+          .attr(
+            "r",
+            filteredData.includes(d) || topTenPapers.includes(d) ? 10 : 4,
+          )
+          .attr("stroke-width", (d: any) =>
+            filteredData.includes(d) || topTenPapers.includes(d) ? 2 : 0,
+          )
+          .attr(
+            "stroke",
+            filteredData.includes(d) || topTenPapers.includes(d)
+              ? "black"
+              : "none",
+          );
 
         tooltip.style("display", "none").style("opacity", 0);
       });
@@ -383,7 +510,10 @@
       // only show the top 5 keywords, remove all double quotes
 
       column_values = new Map(
-        data.map((d) => [d.cluster, d.top_keywords.split(",").slice(0, 5).join(", ").replace(/"/g, "")])
+        data.map((d) => [
+          d.cluster,
+          d.top_keywords.split(",").slice(0, 5).join(", ").replace(/"/g, ""),
+        ]),
       );
       // column_values = new Map(data.map((d) => [d.cluster, d.top_keywords]));
     } else {
@@ -396,7 +526,7 @@
       column_values = new Map(
         Array.from(column_values).sort((a, b) => {
           return parseInt(a[0]) - parseInt(b[0]);
-        })
+        }),
       );
     }
 
@@ -406,7 +536,7 @@
       .data(
         selectedColumn === "faculty"
           ? Array.from(column_values as Set<string>)
-          : Array.from(column_values as Map<string, string>, ([key, _]) => key)
+          : Array.from(column_values as Map<string, string>, ([key, _]) => key),
       )
       .enter()
       .append("g")
