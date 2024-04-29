@@ -31,6 +31,7 @@
   let backgroundDots = [] as any[];
 
   let filteredScholars = [] as ScholarData[];
+  let selectedScholars = [] as ScholarData[];
 
   // control input
   let binsNum = 20;
@@ -449,11 +450,20 @@
       // click and show all the paper position in dot
       .on("click", function (event: any, d: ScholarData) {
         tooltip.style("display", "none").style("opacity", 0);
-        // all the other bin-group should be hidden
-        // d3.selectAll(".bin-group").style("opacity", 0.1);
-
         d3.selectAll(".paper-dot").remove();
-        console.log(d.data, d.x, d.y, xScale(d.x), yScale(d.y));
+
+        d.selected = !d.selected;
+        if (d.selected) {
+          selectedScholars.push(d);
+        } else {
+          selectedScholars = selectedScholars.filter(
+            (scholar) => scholar.id !== d.id
+          );
+        }
+        selectedScholars = Array.from(new Set(selectedScholars));
+        d3.selectAll(".scholar-rect").style("stroke", (d: any) =>
+          d.selected ? "#2C3E50" : "none"
+        );
 
         //@ts-ignore
         d3.select(this.parentNode)
@@ -462,11 +472,9 @@
           .join("circle")
           .attr("class", "paper-dot")
           .attr("cx", (p: Data) => {
-            console.log(p.umap_x, xScale(p.umap_x));
             return xScale(d.x) + p.umap_x * 2;
           })
           .attr("cy", (p: Data) => {
-            console.log(p.umap_y, yScale(p.umap_y));
             return yScale(d.y) + p.umap_y * 2;
           })
           .attr("r", 2)
@@ -1000,6 +1008,7 @@
         <Chat
           {scholarView}
           {selectedBins}
+          {selectedScholars}
           {binData}
           {scholarData}
           on:retrievedReferences={handleHighlightReferences}

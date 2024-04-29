@@ -65,6 +65,7 @@ export type ScholarData = {
     author_id: string;
     email: string;
     data: Data[];
+    selected?: boolean;
 };
 
 
