@@ -7,6 +7,7 @@
   const dispatch = createEventDispatcher();
   export let scholarView: boolean = false;
   export let selectedBins: BinData[] = [];
+  export let selectedScholars: ScholarData[] = [];
   export let scholarData: ScholarData[] = [];
   export let binData: BinData[] = [];
 
@@ -40,14 +41,26 @@
   const sendQuery = async () => {
     answer = "Retrieving Relevant Information...";
     answerParts = [];
-    // TODO: handle selectedBins or selectedScholars
+
+    let queryWithSelected = query;
+    if (selectedScholars.length > 0) {
+      queryWithSelected += " " + selectedScholars.map((scholar) => `[[Researcher: ${scholar.name}]]`).join(" ");
+    }
+
+    if (selectedBins.length > 0) {
+      // get all paper_ids from selectedBins
+      const paperIds = selectedBins.map((bin) => bin.data.map((d) => d.paper_id)).flat();
+      queryWithSelected += " " + paperIds.map((id) => `[[P:${id}]]`).join(" ");
+    }
+
+    console.log(queryWithSelected);
 
     await fetch("http://localhost:8000/retrieval", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ query }),
+      body: JSON.stringify({ query: queryWithSelected }),
     })
       .then((res) => res.json())
       .then((data) => {
@@ -248,6 +261,9 @@
   #qa-section {
     margin-top: 1em;
     flex: 0.4;
+    min-height: 30vh;
+    overflow-y: auto;
+    padding: .2em;
   }
 
   #references {

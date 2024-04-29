@@ -203,16 +203,32 @@ def determine_top_k(scores):
 
     # Find the index of the first difference that is greater than the threshold
     k = next((i for i, diff in enumerate(differences) if diff > threshold), len(scores))
-    k = np.clip(k, 2, 10)
+    k = np.clip(k, 5, 12)
     return k
 
 
 
 def retrieval(query):
     query = re.sub(r"\[/?INST\]", "", query)
-    
     embeddings_df = data_store.get_data()
-    top_results = compute_fused_results(query, np.array(embeddings_df['embeddings'].tolist()), embeddings_df)
+    
+    researchers = [name.lower() for name in re.findall(r'\[\[Researcher: (.*?)\]\]', query)]
+    paper_ids = [id for id in re.findall(r'\[\[P:(.*?)\]\]', query)]
+    paper_ids = [int(id) for id in paper_ids]
+
+    embeddings_df['researcher'] = embeddings_df['first_name'].str.cat(embeddings_df['last_name'], sep=' ')
+    embeddings_df['researcher'] = embeddings_df['researcher'].str.lower()
+
+    filtered_df = embeddings_df[
+        embeddings_df['researcher'].apply(lambda x: any(name in x for name in researchers)) |
+        embeddings_df['paper_id'].isin(paper_ids)
+    ] if len(researchers) > 0 or len(paper_ids) > 0 else embeddings_df
+    
+    if len(filtered_df) == 0:
+        raise HTTPException(status_code=404, detail="No results found for the given query.")
+
+    matrix = np.array(filtered_df['embeddings'].tolist())
+    top_results = compute_fused_results(query, matrix, filtered_df, generate_queries=False)
     
     return top_results
     
