@@ -50,7 +50,7 @@ export type BinData = {
     // editable?: boolean;
     selected?: boolean;
     group?: string;
-    data: Data[];
+    data: (Data|ScholarData)[];
 };
 
 export type ScholarData = {
@@ -66,6 +66,8 @@ export type ScholarData = {
     email: string;
     data: Data[];
     selected?: boolean;
+    width: number;
+    height: number;
 };
 
 
