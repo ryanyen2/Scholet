@@ -833,9 +833,6 @@
           } else {
             return d.data.some((s: ScholarData) => s.data.some((p: Data)=>paperIds.includes(p.paper_id.toString())));
           }
-          return d.data.some((p: Data) =>
-            paperIds.includes(p.paper_id.toString()),
-          );
         })
         .transition()
         .duration(500)
