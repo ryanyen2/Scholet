@@ -44,12 +44,29 @@
 
     let queryWithSelected = query;
     if (selectedScholars.length > 0) {
-      queryWithSelected += " " + selectedScholars.map((scholar) => `[[Researcher: ${scholar.name}]]`).join(" ");
+      queryWithSelected +=
+        " " +
+        selectedScholars
+          .map((scholar) => `[[Researcher: ${scholar.name}]]`)
+          .join(" ");
     }
 
     if (selectedBins.length > 0) {
       // get all paper_ids from selectedBins
-      const paperIds = selectedBins.map((bin) => bin.data.map((d) => d.paper_id)).flat();
+      let paperIds = [] as string[];
+      for (const bin of selectedBins) {
+        if ("paper_id" in bin.data[0]) {
+          for (const d of bin.data as any) {
+            paperIds.push(d.paper_id);
+          }
+        } else {
+          for (const d of bin.data as any) {
+            for (const p of d.data as any) {
+              paperIds.push(p.paper_id);
+            }
+          }
+        }
+      }
       queryWithSelected += " " + paperIds.map((id) => `[[P:${id}]]`).join(" ");
     }
 
@@ -120,13 +137,21 @@
 
       const id = match[1];
 
-      const bin = (scholarView ? scholarData : binData).find((d: any) => {
-        return d.data.some((data: any) => data.paper_id.toString() === id);
-      }) as BinData | ScholarData | undefined;
-
+      let bin: BinData | undefined;
+      if ("cluster" in binData[0].data[0]) {
+        bin = binData.find((d: any) => {
+          return d.data.some((data: any) => data.paper_id.toString() === id);
+        });
+      } else {
+        bin = binData.find((d: any) => {
+          return d.data.some((scholar: ScholarData) =>
+            scholar.data.some((p: any) => p.paper_id.toString() === id),
+          );
+        });
+      }
       if (bin) {
         const clusterCounts: { [cluster: string]: number } = {};
-        bin.data.forEach((p) => {
+        bin.data.forEach((p: any) => {
           const cluster = p.cluster.toString();
           if (cluster in clusterCounts) {
             clusterCounts[cluster]++;
@@ -135,7 +160,7 @@
           }
         });
         const sortedClusters = Object.entries(clusterCounts).sort(
-          (a, b) => b[1] - a[1]
+          (a, b) => b[1] - a[1],
         );
 
         let offset = 0;
@@ -263,7 +288,7 @@
     flex: 0.4;
     min-height: 30vh;
     overflow-y: auto;
-    padding: .2em;
+    padding: 0.2em;
   }
 
   #references {
