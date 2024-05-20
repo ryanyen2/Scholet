@@ -415,7 +415,7 @@
 
           for (const scholar of d.data) {
             const name = scholar.name;
-            const publications = scholar.data.map((p) => ({
+            const publications = scholar.data.map((p: any) => ({
               title: p.title,
               abstract: p.abstract.substring(0, 100), // Get the first 100 characters of the abstract
               cluster: p.cluster,
@@ -487,7 +487,6 @@
       .delay(() => Math.random() * 200)
       .style("opacity", 1);
   }
-
 
   function adjustBins(
     binData: BinData[],
@@ -572,7 +571,6 @@
     return combinedData;
   }
 
-  
   function groupByCluster(binData: BinData[]): any[] {
     const clusterMap = new Map();
     for (const bin of binData) {
@@ -699,7 +697,6 @@
 
   const handleKeywordSearch = async () => {
     const query = searchTerm.trim().toLowerCase();
-
     if (query.length < 3) {
       filteredBins = [];
       d3.selectAll(".rectBin").style("fill-opacity", 0.95);
@@ -710,6 +707,7 @@
 
     if (query.length > 3) {
       if (scholarView) {
+        // remove scholarView
         const matchingScholars = scholarData.filter((scholar: ScholarData) => {
           console.log(
             scholar.name.toLowerCase().trim(),
@@ -735,20 +733,11 @@
 
         filteredScholars = matchingScholars;
         console.log(matchingScholars);
-        d3.selectAll(".scholar-rect").style("fill-opacity", 0.05);
-        d3.selectAll(".scholar-name").style("fill-opacity", 0.05);
-        d3.selectAll(".scholar-rect")
+        d3.selectAll(".rectBin").style("fill-opacity", 0.05);
+        d3.selectAll(".rectBin")
           .filter((d: any) => {
-            console.log(d);
-            return matchingScholars.includes(d);
-          })
-          .transition()
-          .duration(500)
-          .style("fill-opacity", 1);
-
-        d3.selectAll(".scholar-name")
-          .filter((d: any) => {
-            return matchingScholars.includes(d);
+            console.log(d.data);
+            return d.data.some((item: any) => matchingScholars.includes(item));
           })
           .transition()
           .duration(500)
@@ -757,14 +746,16 @@
         const matchingBins = binData.filter((bin: BinData) => {
           const binData = bin.data;
           for (const data of binData) {
-            if (
-              data.email.toLowerCase().includes(query) ||
-              data.first_name.toLowerCase().includes(query) ||
-              data.last_name.toLowerCase().includes(query) ||
-              data.title.toLowerCase().includes(query) ||
-              data.abstract.toLowerCase().includes(query)
-            ) {
-              return true;
+            if ("cluster" in data) {
+              if (
+                data.email.toLowerCase().includes(query) ||
+                data.first_name.toLowerCase().includes(query) ||
+                data.last_name.toLowerCase().includes(query) ||
+                data.title.toLowerCase().includes(query) ||
+                data.abstract.toLowerCase().includes(query)
+              ) {
+                return true;
+              }
             }
           }
           return false;
@@ -827,43 +818,21 @@
     return Object.values(scholarData);
   };
 
-  function toggleView() {
-    scholarView = !scholarView;
-    updatePlot();
-  }
-
   function handleHighlightReferences(event: CustomEvent) {
     const references = event.detail as RefereneceType[];
     const paperIds = references.map((r) => r.paper_id);
     console.log(references, paperIds);
 
-    // highlight bins that contain the references
-    if (scholarView) {
-      d3.selectAll(".scholar-rect").style("fill-opacity", 0.05);
-      d3.selectAll(".scholar-name").style("fill-opacity", 0.05);
-      d3.selectAll(".scholar-rect")
-        .filter((d: any) => {
-          return d.data.some((p: Data) =>
-            paperIds.includes(p.paper_id.toString()),
-          );
-        })
-        .transition()
-        .duration(500)
-        .style("fill-opacity", 1);
-
-      d3.selectAll(".scholar-name")
-        .filter((d: any) => {
-          return d.data.some((p: Data) =>
-            paperIds.includes(p.paper_id.toString()),
-          );
-        })
-        .transition()
-        .duration(500)
-        .style("fill-opacity", 1);
-    } else {
       d3.selectAll(".rectBin").style("fill-opacity", 0.05);
       d3.selectAll(".rectBin")
         .filter((d: any) => {
+          if('cluster' in d.data[0]){
+            return d.data.some((p: Data) =>
+            paperIds.includes(p.paper_id.toString()),
+          );
+          } else {
+            return d.data.some((s: ScholarData) => s.data.some((p: Data)=>paperIds.includes(p.paper_id.toString())));
+          }
           return d.data.some((p: Data) =>
             paperIds.includes(p.paper_id.toString()),
           );
@@ -871,28 +840,20 @@
         .transition()
         .duration(500)
         .style("fill-opacity", 1);
-    }
   }
 
   function handleCitationClick(event: CustomEvent) {
     const paperId = event.detail;
-    if (scholarView) {
-      d3.selectAll(".scholar-rect").style("stroke", "none");
-      d3.selectAll(".scholar-rect")
-        .filter((d: any) => {
-          return d.data.some((p: Data) => p.paper_id.toString() === paperId);
-        })
-        .style("stroke", "#34495e")
-        .style("stroke-width", 2);
-    } else {
       d3.selectAll(".rectBin").style("stroke", "none");
       d3.selectAll(".rectBin")
         .filter((d: any) => {
+          if('cluster' in d.data[0]){
           return d.data.some((p: Data) => p.paper_id.toString() === paperId);
-        })
+        }
+          else { return d.data.some((s: ScholarData) => s.data.some((p: Data)=>p.paper_id.toString() === paperId));
+        }})
         .style("stroke", "#34495e")
         .style("stroke-width", 2);
-    }
   }
 
   async function loadData() {
@@ -903,7 +864,9 @@
 
     data = dataFrame.df;
     binData = constructBinData(data);
-    binData = adjustBins(binData, width, height, 50);
+    scholarData = getScholarData(binData) as ScholarData[];
+    let scholarBinData = constructScholarBinData(scholarData);
+    binData = adjustBins(binData, scholarBinData, width, height, 50);
   }
 
   if (browser) {
@@ -963,18 +926,6 @@
         <!-- <button on:click={handleParamsChange} disabled>Apply</button> -->
 
         <!-- a switch button, toggle isScholarView -->
-        <label class="switch">
-          <input
-            type="checkbox"
-            id="scholarView"
-            bind:checked={scholarView}
-            on:click={toggleView}
-          />
-          <span class="slider round"></span>
-        </label>
-        <label for="scholarView"
-          >{scholarView ? "Paper View" : "Scholar View"}</label
-        >
 
         <!-- <button on:click={selectAllBins}
         >{isSelectAll ? "Unselect All" : "Select All"}</button
