@@ -369,8 +369,20 @@
           return `url(#${gradientId})`;
         }
       })
-      .attr("rx", Math.min(binSize / 5, 15))
-      .attr("ry", Math.min(binSize / 5, 15))
+      .attr("rx", function (b: any) {
+        if('cluster' in b.data[0]){
+          return Math.min(binSize / 5, 15);
+        } else {
+          return Math.min(binSize / 5, 15) *4;
+        }
+      })
+      .attr("ry", function (b: any) {
+        if('cluster' in b.data[0]){
+          return Math.min(binSize / 5, 15);
+        } else {
+          return Math.min(binSize / 5, 15) *4;
+        }
+      })
       .on("mouseover", async function (event: any, d: any) {
         if ("cluster" in d.data[0]) {
           // Group data by unique first_name + last_name
