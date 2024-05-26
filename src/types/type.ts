@@ -48,7 +48,7 @@ export type BinData = {
     height: number;
     // emoji: string;
     // editable?: boolean;
-    selected?: boolean;
+    selected: boolean;
     group?: string;
     data: (Data|ScholarData)[];
 };
@@ -106,3 +106,5 @@ export type FacultyType =
     | "Environment"
     | "Healh"
     | "";
+
+export type CombinedData = BinData | ScholarData;

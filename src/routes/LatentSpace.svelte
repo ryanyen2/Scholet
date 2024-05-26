@@ -18,6 +18,7 @@
   let data: Data[];
   let binData: BinData[];
   let scholarData: ScholarData[];
+  let scholarMap: Map<string, BinData[]>;
 
   let svg = null as any;
   let tooltip = null as any;
@@ -96,16 +97,18 @@
   function constructScholarBinData(data: ScholarData[]): BinData[] {
     const scholarBinsMap = new Map<string, BinData>();
 
-    const minDataX = d3.min(binData, (d) => d.x) as number;
-    const maxDataX = d3.max(binData, (d) => d.x) as number;
-    const minDataY = d3.min(binData, (d) => d.y) as number;
-    const maxDataY = d3.max(binData, (d) => d.y) as number;
+    const allXValues = binData.flatMap((d) => d.data.map((p: any) => p.umap_x));
+    const allYValues = binData.flatMap((d) => d.data.map((p: any) => p.umap_y));
+    const minDataX = Math.min(...allXValues);
+    const maxDataX = Math.max(...allXValues);
+    const minDataY = Math.min(...allYValues);
+    const maxDataY = Math.max(...allYValues);
 
-    const sizeX = (maxDataX - minDataX) / (binsNum - 1);
-    const sizeY = (maxDataY - minDataY) / (binsNum - 1);
+    const sizeX = (maxDataX - minDataX) / binsNum;
+    const sizeY = (maxDataY - minDataY) / binsNum;
     data.forEach((d: ScholarData) => {
-      const x = Math.floor(d.x / sizeX) * sizeX;
-      const y = Math.floor(d.y / sizeY) * sizeY;
+      const x = Math.floor(d.x / sizeX);
+      const y = Math.floor(d.y / sizeY);
       const id = `${x}_${y}`;
       let binData = scholarBinsMap.get(id);
 
@@ -279,7 +282,7 @@
       .attr("height", (d: any) => d.height)
       .attr("fill", function (d: BinData) {
         const totalPoints = d.data.length;
-        if ("cluster" in d.data[0]) {
+        if (!isScholarData(d)) {
           let groupedByCluster = d3.group(d.data, (p: any) => p.cluster);
 
           // sort by cluster size
@@ -301,7 +304,7 @@
             .attr("y2", "100%");
 
           if (totalPoints === 1) {
-            if ("cluster" in d.data[0]) {
+            if (!isScholarData(d)) {
               return clusterColor((d.data[0] as Data).cluster.toString());
             }
           }
@@ -324,13 +327,11 @@
 
           return `url(#${gradientId})`;
         } else {
-          const totalPoints = d.data.length;
+          const totalScholars = d.data.length;
+          let groupedByScholar = d3.group(d.data, (p: any) => p.name);
 
-          let flattenedData = d.data.flatMap((datum: any) => datum.data);
-          let groupedByCluster = d3.group(flattenedData, (p) => p.cluster);
-
-          groupedByCluster = new Map(
-            Array.from(groupedByCluster).sort((a, b) => {
+          groupedByScholar = new Map(
+            Array.from(groupedByScholar).sort((a, b) => {
               return b[1].length - a[1].length;
             }),
           );
@@ -347,11 +348,11 @@
             .attr("y2", "100%");
 
           if (totalPoints === 1) {
-            return clusterColor(d.data[0].data[0].cluster.toString());
+            return clusterColor(d.data[0].name.toString());
           }
 
           let accumulated = 0;
-          groupedByCluster.forEach((value, key) => {
+          groupedByScholar.forEach((value, key) => {
             const clusterSize = value.length;
             const portion = accumulated / totalPoints;
             const nextPortion = (accumulated + clusterSize) / totalPoints;
@@ -370,21 +371,21 @@
         }
       })
       .attr("rx", function (b: any) {
-        if('cluster' in b.data[0]){
+        if ("cluster" in b.data[0]) {
           return Math.min(binSize / 5, 15);
         } else {
-          return Math.min(binSize / 5, 15) *4;
+          return Math.min(binSize / 5, 15) * 4;
         }
       })
       .attr("ry", function (b: any) {
-        if('cluster' in b.data[0]){
+        if ("cluster" in b.data[0]) {
           return Math.min(binSize / 5, 15);
         } else {
-          return Math.min(binSize / 5, 15) *4;
+          return Math.min(binSize / 5, 15) * 4;
         }
       })
       .on("mouseover", async function (event: any, d: any) {
-        if ("cluster" in d.data[0]) {
+        if (!isScholarData(d)) {
           // Group data by unique first_name + last_name
           const groupedData = d.data.reduce((acc: any, p: any) => {
             const name = `${p.first_name} ${p.last_name}`;
@@ -480,11 +481,53 @@
       .style("stroke-width", 2)
       .on("click", (event: any, d: BinData) => {
         tooltip.style("display", "none").style("opacity", 0);
+        d3.selectAll("line").remove();
         d.selected = !d.selected;
         if (d.selected) {
           selectedBins.push(d);
+          if (isScholarData(d)) {
+            let relatedPaperBins = [] as BinData[];
+            d.data.forEach((scholar: any) => {
+              let bins = scholarMap.get(scholar.name);
+              if (bins !== undefined) {
+                relatedPaperBins = relatedPaperBins.concat(bins);
+                relatedPaperBins = relatedPaperBins.filter(
+                  (item, index) => relatedPaperBins.indexOf(item) === index,
+                );
+              }
+            });
+            const dataLinks = [] as any[];
+            binData.forEach((bin) => {
+              if (
+                relatedPaperBins.some(
+                  (relatedBin) =>
+                    !isScholarData(bin) && relatedBin.id === bin.id,
+                )
+              ) {
+                bin.selected = true;
+                selectedBins.push(bin);
+                dataLinks.push({
+                  source: d,
+                  target: bin,
+                });
+              }
+            });
+            const g = d3.select("g");
+            const link = g
+              .selectAll("line")
+              .data(dataLinks)
+              .enter()
+              .append("line")
+              .style("stroke", "black")
+              .style("stroke-width", 0.75)
+              .attr("x1", (d) => d.source.x+d.source.width/2)
+              .attr("y1", (d) => d.source.y+d.source.height/2)
+              .attr("x2", (d) => d.target.x+d.target.width/2)
+              .attr("y2", (d) => d.target.y+d.target.height/2);
+          }
         } else {
           selectedBins = selectedBins.filter((bin) => bin.id !== d.id);
+          
         }
 
         selectedBins = Array.from(new Set(selectedBins));
@@ -786,7 +829,6 @@
 
   const handleBinsNumChange = async () => {
     binData = constructBinData(data);
-    scholarData = getScholarData(binData) as ScholarData[];
     let scholarBinData = constructScholarBinData(scholarData);
     binData = adjustBins(binData, scholarBinData, width, height, 50);
     redraw();
@@ -794,6 +836,7 @@
 
   const getScholarData = (binData: BinData[]): ScholarData[] => {
     const scholarData = {} as any;
+    scholarMap = new Map<string, BinData[]>();
 
     binData.forEach((bin) => {
       bin.data.forEach((p: any) => {
@@ -818,6 +861,11 @@
         scholarData[name].y += p.umap_y;
         scholarData[name].data.push(p);
         scholarData[name].count++;
+
+        if (!scholarMap.has(name)) {
+          scholarMap.set(name, []);
+        }
+        scholarMap.get(name)!.push(bin);
       });
     });
 
@@ -835,34 +883,39 @@
     const paperIds = references.map((r) => r.paper_id);
     console.log(references, paperIds);
 
-      d3.selectAll(".rectBin").style("fill-opacity", 0.05);
-      d3.selectAll(".rectBin")
-        .filter((d: any) => {
-          if('cluster' in d.data[0]){
-            return d.data.some((p: Data) =>
+    d3.selectAll(".rectBin").style("fill-opacity", 0.05);
+    d3.selectAll(".rectBin")
+      .filter((d: any) => {
+        if ("cluster" in d.data[0]) {
+          return d.data.some((p: Data) =>
             paperIds.includes(p.paper_id.toString()),
           );
-          } else {
-            return d.data.some((s: ScholarData) => s.data.some((p: Data)=>paperIds.includes(p.paper_id.toString())));
-          }
-        })
-        .transition()
-        .duration(500)
-        .style("fill-opacity", 1);
+        } else {
+          return d.data.some((s: ScholarData) =>
+            s.data.some((p: Data) => paperIds.includes(p.paper_id.toString())),
+          );
+        }
+      })
+      .transition()
+      .duration(500)
+      .style("fill-opacity", 1);
   }
 
   function handleCitationClick(event: CustomEvent) {
     const paperId = event.detail;
-      d3.selectAll(".rectBin").style("stroke", "none");
-      d3.selectAll(".rectBin")
-        .filter((d: any) => {
-          if('cluster' in d.data[0]){
+    d3.selectAll(".rectBin").style("stroke", "none");
+    d3.selectAll(".rectBin")
+      .filter((d: any) => {
+        if ("cluster" in d.data[0]) {
           return d.data.some((p: Data) => p.paper_id.toString() === paperId);
+        } else {
+          return d.data.some((s: ScholarData) =>
+            s.data.some((p: Data) => p.paper_id.toString() === paperId),
+          );
         }
-          else { return d.data.some((s: ScholarData) => s.data.some((p: Data)=>p.paper_id.toString() === paperId));
-        }})
-        .style("stroke", "#34495e")
-        .style("stroke-width", 2);
+      })
+      .style("stroke", "#34495e")
+      .style("stroke-width", 2);
   }
 
   async function loadData() {
@@ -876,6 +929,10 @@
     scholarData = getScholarData(binData) as ScholarData[];
     let scholarBinData = constructScholarBinData(scholarData);
     binData = adjustBins(binData, scholarBinData, width, height, 50);
+  }
+
+  function isScholarData(d: any): boolean {
+    return "name" in d.data[0];
   }
 
   if (browser) {
