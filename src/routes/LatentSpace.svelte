@@ -527,7 +527,7 @@
           }
         } else {
           selectedBins = selectedBins.filter((bin) => bin.id !== d.id);
-          
+
         }
 
         selectedBins = Array.from(new Set(selectedBins));
@@ -829,6 +829,7 @@
 
   const handleBinsNumChange = async () => {
     binData = constructBinData(data);
+    scholarData = getScholarData(binData) as ScholarData[];
     let scholarBinData = constructScholarBinData(scholarData);
     binData = adjustBins(binData, scholarBinData, width, height, 50);
     redraw();
