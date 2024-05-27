@@ -553,23 +553,52 @@
     // Remove empty bins
     binData = binData.filter((bin: any) => bin.data.length > 0);
     scholarData = scholarData.filter((scholar: any) => scholar.data.length > 0);
+    
+   binData.sort((a, b) => {
+      if (a.y === b.y) {
+        return a.x - b.x;
+      }
+      return a.y - b.y;
+    });
+
+    let combinedData = binData.concat(scholarData);
+
+    combinedData.sort((a, b) => {
+      if (a.y === b.y) {
+        return a.x - b.x;
+      }
+      return a.y - b.y;
+    });
+
+    let count = 0;
+    let prev = combinedData[0];
+    for (let i = 1; i < combinedData.length - 1; i++) {
+      if (combinedData[i].y != prev.y) {
+        // new y
+        count = 0;
+        prev = combinedData[i];
+      } else {
+        combinedData[i].x += count;
+        if (combinedData[i].x == prev.x) {
+          count++;
+          combinedData[i].x++;
+        }
+        prev = combinedData[i];
+      }
+    }
 
     // Find the minimum and maximum bin coordinates
-    const minX = d3.min(binData, (d) => d.x) as number;
-    const maxX = d3.max(binData, (d) => d.x) as number;
-    const minY = d3.min(binData, (d) => d.y) as number;
-    const maxY = d3.max(binData, (d) => d.y) as number;
+    const minX = d3.min(combinedData, (d) => d.x) as number;
+    const maxX = d3.max(combinedData, (d) => d.x) as number;
+    const minY = d3.min(combinedData, (d) => d.y) as number;
+    const maxY = d3.max(combinedData, (d) => d.y) as number;
 
     // Normalize the coordinates to the range [0, 1]
-    binData.forEach((d: BinData) => {
+    combinedData.forEach((d: BinData) => {
       d.x = (d.x - minX) / (maxX - minX);
       d.y = (d.y - minY) / (maxY - minY);
     });
 
-    scholarData.forEach((d: BinData) => {
-      d.x = (d.x - minX) / (maxX - minX);
-      d.y = (d.y - minY) / (maxY - minY);
-    });
 
     width = window.innerWidth * 0.6 - margin.left - margin.right;
     // height using 100vh
@@ -581,46 +610,12 @@
 
     binSizeX = Math.min(binSizeX, binSizeY) * 1.1;
 
-    binData.sort((a, b) => {
-      if (a.y === b.y) {
-        return a.x - b.x;
-      }
-      return a.y - b.y;
-    });
-
-    let combinedData = binData.concat(scholarData);
-    combinedData.sort((a, b) => {
-      if (a.y === b.y) {
-        return a.x - b.x;
-      }
-      return a.y - b.y;
-    });
-
-    const interval = binData[1].x - binData[0].x;
-
-    let count = 0;
-    let prev = combinedData[0];
-    for (let i = 1; i < combinedData.length - 1; i++) {
-      if (combinedData[i].y != prev.y) {
-        // new y
-        count = 0;
-        prev = combinedData[i];
-      } else {
-        combinedData[i].x += count * interval;
-        if (combinedData[i].x == prev.x) {
-          count++;
-          combinedData[i].x += interval;
-        }
-        prev = combinedData[i];
-      }
-    }
-
     // Adjust bin coordinates and size to avoid overlap
     combinedData.forEach((bin: any) => {
       bin.width = binSizeX;
       bin.height = Math.min(binSizeX, binSizeY);
-      bin.x = padding + bin.x * width;
-      bin.y = padding + bin.y * (height - padding);
+      bin.x = padding + bin.x * (width+padding);
+      bin.y = padding + bin.y * height;
     });
 
     return combinedData;
