@@ -33,7 +33,7 @@ class DataStore:
        'umap_x_bin_36', 'umap_y_bin_36', 'umap_x_bin_38', 'umap_y_bin_38'])
 
     def load_data(self):
-        csv_path = os.path.join('./data', 'ai_pubdate.csv')
+        csv_path = os.path.join('./data', 'ieee_vis_embed.csv')
         df = pd.read_csv(csv_path)
         df['paper_id'] = df.index
         df['embeddings'] = df['embeddings'].apply(eval)
