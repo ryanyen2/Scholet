@@ -119,8 +119,8 @@ def reciprocal_rank_fusion(search_results_dict, df, k=60):
     for query, index_doc_scores in search_results_dict.items():
         for rank, (index, (doc, score)) in enumerate(sorted(index_doc_scores.items(), key=lambda x: x[1][1], reverse=True)):
             if index not in index_fused_scores:
-                paper_id = df.loc[df['abstract'] == doc]['paper_id'].values[0]
-                index_fused_scores[index] = {'abstract': doc, 'score': 0, 'paper_id': paper_id, 'title': df.loc[paper_id]['title'], 'name': df.loc[paper_id]['first_name'] + ' ' + df.loc[paper_id]['last_name']}
+                paper_id = df.loc[df['Abstract'] == doc]['paper_id'].values[0]
+                index_fused_scores[index] = {'Abstract': doc, 'score': 0, 'paper_id': paper_id, 'Title': df.loc[paper_id]['Title'], 'name': (df.loc[paper_id]['AuthorNames']).split(';')[0]}
             previous_score = index_fused_scores[index]['score']
             # Update the score based on the reciprocal rank fusion algorithm
             index_fused_scores[index]['score'] += 1 / (rank + k)
@@ -157,7 +157,7 @@ def compute_fused_results(original_query, matrix, df, generate_queries=False):
         query_embedding = query_embedding.cpu().detach().numpy()
 
         distances = np.linalg.norm(matrix - query_embedding, axis=1)
-        search_results_dict[original_query] = dict(zip(df.index, zip(df['abstract'], distances)))
+        search_results_dict[original_query] = dict(zip(df.index, zip(df['Abstract'], distances)))
         reranked_results = reciprocal_rank_fusion(search_results_dict, df)
         queries = [original_query]
         
@@ -171,7 +171,7 @@ def compute_fused_results(original_query, matrix, df, generate_queries=False):
     for result in top_results:
         paper_id = result['paper_id']
         row = df.loc[paper_id]
-        sentences = text_splitter.split_text(row['abstract'])
+        sentences = text_splitter.split_text(row['Abstract'])
 
         for i, sentence in enumerate(sentences):
             sentence_embedding = model.encode(sentence, convert_to_tensor=True)
@@ -216,8 +216,9 @@ def retrieval(query):
     paper_ids = [id for id in re.findall(r'\[\[P:(.*?)\]\]', query)]
     paper_ids = [int(id) for id in paper_ids]
 
-    embeddings_df['researcher'] = embeddings_df['first_name'].str.cat(embeddings_df['last_name'], sep=' ')
-    embeddings_df['researcher'] = embeddings_df['researcher'].str.lower()
+    # embeddings_df['researcher'] = embeddings_df['first_name'].str.cat(embeddings_df['last_name'], sep=' ')
+    # embeddings_df['researcher'] = embeddings_df['researcher'].str.lower()
+    embeddings_df['researcher'] = embeddings_df['AuthorNames'].str.lower()
 
     filtered_df = embeddings_df[
         embeddings_df['researcher'].apply(lambda x: any(name in x for name in researchers)) |

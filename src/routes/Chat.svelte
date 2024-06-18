@@ -1,14 +1,14 @@
 <script lang="ts">
   import * as d3 from "d3";
   import { createEventDispatcher } from "svelte";
-  import type { RefereneceType, BinData, ScholarData } from "../types/type.js";
+  import type { RefereneceType, BinData, ScholarData, IEEEScholarData, IEEEData } from "../types/type.js";
   import Citation from "./Citation.svelte";
 
   const dispatch = createEventDispatcher();
   export let scholarView: boolean = false;
   export let selectedBins: BinData[] = [];
-  export let selectedScholars: ScholarData[] = [];
-  export let scholarData: ScholarData[] = [];
+  export let selectedScholars: IEEEScholarData[] = [];
+  export let scholarData: IEEEScholarData[] = [];
   export let binData: BinData[] = [];
 
   let answerParts = [] as Array<{
@@ -47,7 +47,7 @@
       queryWithSelected +=
         " " +
         selectedScholars
-          .map((scholar) => `[[Researcher: ${scholar.name}]]`)
+          .map((scholar) => `[[Researcher: ${scholar.AuthorName}]]`)
           .join(" ");
     }
 
@@ -70,7 +70,6 @@
       queryWithSelected += " " + paperIds.map((id) => `[[P:${id}]]`).join(" ");
     }
 
-    console.log(queryWithSelected);
 
     await fetch("http://localhost:8000/retrieval", {
       method: "POST",
@@ -82,7 +81,6 @@
       .then((res) => res.json())
       .then((data) => {
         data = JSON.parse(data);
-        console.log(data);
         references = [...data];
       });
 
@@ -93,8 +91,8 @@
       return {
         id: ref.paper_id,
         author: ref.name,
-        title: ref.title,
-        text: ref.abstract,
+        title: ref.Title,
+        text: ref.Abstract,
       };
     });
 
@@ -117,7 +115,6 @@
       result += value;
       answer = result;
     }
-
     processResult(result);
   };
 
@@ -138,25 +135,34 @@
       const id = match[1];
 
       let bin: BinData | undefined;
-      if ("cluster" in binData[0].data[0]) {
-        bin = binData.find((d: any) => {
-          return d.data.some((data: any) => data.paper_id.toString() === id);
+      bin = binData.find((d: BinData) => {
+          if ("cluster" in d.data[0]) {
+            return d.data.some((p: any) => (p.paper_id).toString() === id);
+          } else {
+            return d.data.some((scholar: any) =>
+              scholar.data.some((p: any) => (p.paper_id).toString() === id),
+            );
+          }
         });
-      } else {
-        bin = binData.find((d: any) => {
-          return d.data.some((scholar: ScholarData) =>
-            scholar.data.some((p: any) => p.paper_id.toString() === id),
-          );
-        });
-      }
       if (bin) {
         const clusterCounts: { [cluster: string]: number } = {};
         bin.data.forEach((p: any) => {
-          const cluster = p.cluster.toString();
-          if (cluster in clusterCounts) {
-            clusterCounts[cluster]++;
+          if ("cluster" in p) {
+            const cluster = p.cluster.toString();
+            if (cluster in clusterCounts) {
+              clusterCounts[cluster]++;
+            } else {
+              clusterCounts[cluster] = 1;
+            }
           } else {
-            clusterCounts[cluster] = 1;
+            p.data.forEach((p: any) => {
+              const cluster = p.cluster.toString();
+              if (cluster in clusterCounts) {
+                clusterCounts[cluster]++;
+              } else {
+                clusterCounts[cluster] = 1;
+              }
+            });
           }
         });
         const sortedClusters = Object.entries(clusterCounts).sort(
@@ -180,9 +186,12 @@
           gradient,
         });
       } else {
+        let gradient = `linear-gradient(90deg, #3498db 0%, #3498db 100%)`;
+
         answerParts.push({
           type: "citation",
           id,
+          gradient,
         });
       }
 
@@ -254,11 +263,11 @@
         {#each references as ref (ref.paper_id + Math.random())}
           <tr>
             <td>{ref.name}</td>
-            <td>{ref.title}</td>
+            <td>{ref.Title}</td>
             <td
-              >{ref.abstract.substring(0, 100) +
+              >{ref.Abstract.substring(0, 100) +
                 "..." +
-                ref.abstract.substring(ref.abstract.length - 100)}</td
+                ref.Abstract.substring(ref.Abstract.length - 100)}</td
             >
           </tr>
         {/each}
@@ -286,7 +295,7 @@
   #qa-section {
     margin-top: 1em;
     flex: 0.4;
-    min-height: 30vh;
+    min-height: 40vh;
     overflow-y: auto;
     padding: 0.2em;
   }
@@ -295,12 +304,13 @@
     flex-grow: 1;
     overflow-y: scroll;
     width: 100%;
-    min-height: 30vh;
+    min-height: 20vh;
   }
 
   #references table {
     width: 100%;
     border-collapse: collapse;
+    font-size: x-small;
   }
 
   #references th,
