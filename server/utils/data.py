@@ -19,10 +19,16 @@ _TOP_KERWORDS = 5
 class DataStore:
     def __init__(self):
         # self.embeddings_dfs = {}
-        self.embeddings_df = pd.DataFrame(columns=['email', 'first_name', 'last_name', 'faculty', 'department',
-       'area_of_focus', 'gs_link', 'author_id', 'title', 'abstract', 'doi',
-       'gs_url', 'embeddings', 'umap_x', 'umap_y', 'cluster', 'kde',
-       'top_keywords', 'department_broad', 'focus_label', 'focus_tag',
+        self.embeddings_df = pd.DataFrame(columns=[
+        'Conference', 'Year', 'Title', 'DOI', 'Link', 'FirstPage', 'LastPage',
+       'PaperType', 'Abstract', 'AuthorNames-Deduped', 'AuthorNames',
+       'AuthorAffiliation', 'InternalReferences', 'AuthorKeywords',
+       'AminerCitationCount', 'CitationCount_CrossRef', 'PubsCited_CrossRef',
+       'Downloads_Xplore', 'Award', 'GraphicsReplicabilityStamp',
+       'embeddings', 'umap_x', 'umap_y', 'cluster', 'top_keywords',
+            # 'email', 'first_name', 'last_name', 'faculty', 'department',
+    #    'area_of_focus', 'gs_link', 'author_id', 'title', 'abstract', 'doi',
+    #    'gs_url', 'kde', 'department_broad', 'focus_label', 'focus_tag',
        'umap_x_bin_10', 'umap_y_bin_10', 'umap_x_bin_12', 'umap_y_bin_12',
        'umap_x_bin_14', 'umap_y_bin_14', 'umap_x_bin_16', 'umap_y_bin_16',
        'umap_x_bin_18', 'umap_y_bin_18', 'umap_x_bin', 'umap_y_bin',
@@ -38,6 +44,10 @@ class DataStore:
         df['paper_id'] = df.index
         df['embeddings'] = df['embeddings'].apply(eval)
         df['bin_id'] = df.apply(lambda x: f'{x["umap_x_bin_30"]}_{x["umap_y_bin_30"]}', axis=1)
+        
+        # get year > 2015
+        # df = df[df['Year'] > 2020]
+        
         self.embeddings_df = df
 
     def get_data(self):

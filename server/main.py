@@ -48,7 +48,7 @@ messages_history = []
 
 # Say "information is missing on" followed by the related topic, if the given context do not provide sufficient information to the question; but if it's prompt for a task, complete the task.
 _rag_query_text = """
-You are a large language AI assistant helps answering users' questions about UWaterloo AI Instritute's scholars and their papers. 
+You are an AI assistant helps answering users' questions about scholars and their papers. 
 You are given a user question, and please write clean, concise and accurate answer to the question like what are the related research being done. 
 You will be given a set of related contexts to the question, each starting with a reference number like [[citation:xx]], where xx is a referenced number. Please use the context and cite the context at the end of each sentence if related.
 
@@ -111,8 +111,7 @@ async def data():
     embeddings_df = data_store.get_data()
     print(embeddings_df.shape)
     embeddings_df.replace([np.inf, -np.inf], np.nan, inplace=True)
-    embeddings_df.fillna(999, inplace=True)  # replace NaN values with an arbitrary number
-    
+    embeddings_df.fillna("", inplace=True)  # replace NaN values with an arbitrary number
     embeddings_df = embeddings_df.to_dict(orient="records")
     return {"df": embeddings_df, "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 
@@ -201,14 +200,14 @@ async def rag(message_request: MessageRequest):
         global messages_history
         
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            # model="gpt-4-turbo-preview",
+            # model="gpt-3.5-turbo",
+            model="gpt-4-turbo-preview",
             messages= messages_history + [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt},
             ],
             max_tokens=4096,
-            temperature=0.1,
+            temperature=1,
             stream=True,
         )
         

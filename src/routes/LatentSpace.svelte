@@ -7,6 +7,8 @@
     BinData,
     ScholarData,
     RefereneceType,
+    IEEEData,
+    IEEEScholarData,
   } from "../types/type.js";
   // import { createEventDispatcher } from "svelte";
   // import { Marked } from "@ts-stack/markdown";
@@ -16,8 +18,10 @@
   let scholarView = false as boolean;
 
   let data: Data[];
+  let ieeeData: IEEEData[];
   let binData: BinData[];
-  let scholarData: ScholarData[];
+  // let scholarData: ScholarData[];
+  let scholarData: IEEEScholarData[];
   let scholarMap: Map<string, BinData[]>;
 
   let svg = null as any;
@@ -31,13 +35,14 @@
   let selectedBins = [] as BinData[];
   let backgroundDots = [] as any[];
 
-  let filteredScholars = [] as ScholarData[];
-  let selectedScholars = [] as ScholarData[];
+  let filteredScholars = [] as IEEEScholarData[];
+  let selectedScholars = [] as IEEEScholarData[];
 
   // control input
   let binsNum = 20;
   let clusterNum = 5;
   let searchTerm = "" as string;
+  let [minYear, maxYear] = [1990, 2022] as number[];
 
   let isSelectAll = false as boolean;
 
@@ -68,19 +73,19 @@
 
   let longTermVis: HTMLDivElement;
 
-  function constructBinData(data: Data[]): BinData[] {
+  function constructBinData(data: IEEEData[]): BinData[] {
     const binsMap = new Map<string, BinData>();
 
     for (const point of data) {
       // df['bin_id'] = df.apply(lambda x: f'{x["umap_x_bin"]}_{x["umap_y_bin"]}', axis=1)
-      const binId = `${point[`umap_x_bin_${binsNum}` as keyof Data]}_${point[`umap_y_bin_${binsNum}` as keyof Data]}`;
+      const binId = `${point[`umap_x_bin_${binsNum}` as keyof IEEEData]}_${point[`umap_y_bin_${binsNum}` as keyof IEEEData]}`;
       let binData = binsMap.get(binId);
 
       if (!binData) {
         binData = {
           id: binId,
-          x: point[`umap_x_bin_${binsNum}` as keyof Data] as number,
-          y: point[`umap_y_bin_${binsNum}` as keyof Data] as number,
+          x: point[`umap_x_bin_${binsNum}` as keyof IEEEData] as number,
+          y: point[`umap_y_bin_${binsNum}` as keyof IEEEData] as number,
           width: binSize,
           height: binSize,
           selected: false,
@@ -94,7 +99,7 @@
     return Array.from(binsMap.values());
   }
 
-  function constructScholarBinData(data: ScholarData[]): BinData[] {
+  function constructScholarBinData(data: IEEEScholarData[]): BinData[] {
     const scholarBinsMap = new Map<string, BinData>();
 
     const allXValues = binData.flatMap((d) => d.data.map((p: any) => p.umap_x));
@@ -106,7 +111,7 @@
 
     const sizeX = (maxDataX - minDataX) / binsNum;
     const sizeY = (maxDataY - minDataY) / binsNum;
-    data.forEach((d: ScholarData) => {
+    data.forEach((d: IEEEScholarData) => {
       const x = Math.floor(d.x / sizeX);
       const y = Math.floor(d.y / sizeY);
       const id = `${x}_${y}`;
@@ -186,7 +191,9 @@
       .style("border", "solid")
       .style("border-width", "1px")
       .style("border-radius", "5px")
-      .style("padding", "10px");
+      .style("padding", "10px")
+      // font-size: 12px;
+      .style("font-size", "10px");
 
     svg
       .append("clipPath")
@@ -220,7 +227,7 @@
 
     // remove duplicates
     allKeywords = allKeywords.filter(
-      (v, i, a) => a.findIndex((t) => t.cluster === v.cluster) === i,
+      (v, i, a) => a.findIndex((t) => t.cluster === v.cluster) === i
     ) as { cluster: number; keywords: string }[];
 
     legend
@@ -232,16 +239,8 @@
       .each(function (d: any) {
         // @ts-ignore
         const that = this;
-        // console.log(d.cluster, clusterColor(d.cluster));
-        d3.select(that)
-          .append("rect")
-          .attr("x", 0)
-          .attr("y", 0)
-          .attr("width", 10)
-          .attr("height", 10)
-          .attr("fill", clusterColor(d.cluster.toString()));
-
-        d3.select(that)
+        const text = d3
+          .select(that)
           .append("text")
           .attr("x", 12)
           .attr("y", 8)
@@ -250,17 +249,58 @@
               .split(", ")
               .slice(0, 4)
               .join(", ")
-              .replace(/['"[\]]/g, ""),
+              .replace(/['"[\]]/g, "")
           )
           .attr("fill", "#2C3E50")
           .style("font-size", "12px")
-          .style("fill-opacity", 0.6)
+          .style("fill-opacity", 0);
+
+        d3.select(that)
+          .append("rect")
+          .attr("x", 0)
+          .attr("y", 0)
+          .attr("width", 10)
+          .attr("height", 10)
+          .attr("fill", clusterColor(d.cluster.toString()))
+          .on("click", function () {
+            const currentOpacity = text.style("fill-opacity");
+            const newOpacity = currentOpacity === "0" ? "0.6" : "0";
+            text.transition().duration(500).style("fill-opacity", newOpacity);
+          })
           .on("mouseover", function () {
             d3.select(this).style("fill-opacity", 1);
           })
           .on("mouseleave", function () {
             d3.select(this).style("fill-opacity", 0.6);
           });
+        // d3.select(that)
+        //   .append("rect")
+        //   .attr("x", 0)
+        //   .attr("y", 0)
+        //   .attr("width", 10)
+        //   .attr("height", 10)
+        //   .attr("fill", clusterColor(d.cluster.toString()));
+
+        // d3.select(that)
+        //   .append("text")
+        //   .attr("x", 12)
+        //   .attr("y", 8)
+        //   .text(
+        //     d.keywords
+        //       .split(", ")
+        //       .slice(0, 4)
+        //       .join(", ")
+        //       .replace(/['"[\]]/g, "")
+        //   )
+        //   .attr("fill", "#2C3E50")
+        //   .style("font-size", "12px")
+        //   .style("fill-opacity", 0.6)
+        //   .on("mouseover", function () {
+        //     d3.select(this).style("fill-opacity", 1);
+        //   })
+        //   .on("mouseleave", function () {
+        //     d3.select(this).style("fill-opacity", 0.6);
+        //   });
       });
   }
 
@@ -278,8 +318,20 @@
       .attr("class", "rectBin")
       .attr("x", (d: any) => d.x)
       .attr("y", (d: any) => d.y)
-      .attr("width", (d: any) => d.width)
-      .attr("height", (d: any) => d.height)
+      .attr("width", (d: any) => {
+        if ("Title" in d.data[0]) {
+          return d.width;
+        } else {
+          return d.width * 1.01;
+        }
+      })
+      .attr("height", (d: any) => {
+        if ("Title" in d.data[0]) {
+          return d.height;
+        } else {
+          return d.height * 1.01;
+        }
+      })
       .attr("fill", function (d: BinData) {
         const totalPoints = d.data.length;
         if (!isScholarData(d)) {
@@ -289,7 +341,7 @@
           groupedByCluster = new Map(
             Array.from(groupedByCluster).sort((a, b) => {
               return b[1].length - a[1].length;
-            }),
+            })
           );
 
           // @ts-ignore
@@ -305,7 +357,7 @@
 
           if (totalPoints === 1) {
             if (!isScholarData(d)) {
-              return clusterColor((d.data[0] as Data).cluster.toString());
+              return clusterColor((d.data[0] as IEEEData).cluster.toString());
             }
           }
 
@@ -328,12 +380,12 @@
           return `url(#${gradientId})`;
         } else {
           const totalScholars = d.data.length;
-          let groupedByScholar = d3.group(d.data, (p: any) => p.name);
+          let groupedByScholar = d3.group(d.data, (p: any) => p.AuthorName);
 
           groupedByScholar = new Map(
             Array.from(groupedByScholar).sort((a, b) => {
               return b[1].length - a[1].length;
-            }),
+            })
           );
 
           // @ts-ignore
@@ -348,7 +400,9 @@
             .attr("y2", "100%");
 
           if (totalPoints === 1) {
-            return clusterColor(d.data[0].name.toString());
+            return clusterColor(
+              (d.data[0] as IEEEScholarData).AuthorName.toString()
+            );
           }
 
           let accumulated = 0;
@@ -371,37 +425,65 @@
         }
       })
       .attr("rx", function (b: any) {
-        if ("cluster" in b.data[0]) {
+        if ("Title" in b.data[0]) {
           return Math.min(binSize / 5, 15);
         } else {
-          return Math.min(binSize / 5, 15) * 4;
+          return Math.min(binSize / 5, 15) * 10;
         }
       })
       .attr("ry", function (b: any) {
-        if ("cluster" in b.data[0]) {
+        if ("Title" in b.data[0]) {
           return Math.min(binSize / 5, 15);
         } else {
-          return Math.min(binSize / 5, 15) * 4;
+          return Math.min(binSize / 5, 15) * 10;
         }
       })
       .on("mouseover", async function (event: any, d: any) {
         if (!isScholarData(d)) {
           // Group data by unique first_name + last_name
-          const groupedData = d.data.reduce((acc: any, p: any) => {
-            const name = `${p.first_name} ${p.last_name}`;
+          const groupedData = d.data.reduce((acc: any, p: IEEEData) => {
+            // const name = `${p.first_name} ${p.last_name}`;
+            const name = p.AuthorNames.split(";")[0];
             if (!acc[name]) {
-              acc[name] = { titles: [], cluster: p.cluster };
+              acc[name] = { titles: [], cluster: p.cluster, abstracts: [] };
             }
-            acc[name].titles.push(p.title);
+            acc[name].titles.push(p.Title);
+            acc[name].abstracts.push(p.Abstract);
             return acc;
           }, {});
+
+          let minCount = Infinity;
+          let maxCount = -Infinity;
+          const query = searchTerm.trim().toLowerCase();
+
+          for (const name in groupedData) {
+            // let count = 0;
+            // for (const title of groupedData[name].titles) {
+            //   count += (title.match(new RegExp(query, "g")) || []).length;
+            // }
+
+            for (const abstract of groupedData[name].abstracts) {
+              const count = (abstract.match(new RegExp(query, "g")) || [])
+                .length;
+              minCount = Math.min(minCount, count);
+              maxCount = Math.max(maxCount, count);
+            }
+          }
 
           let tableHtml = "<table>";
           for (const name in groupedData) {
             const color = clusterColor(groupedData[name].cluster.toString());
             tableHtml += `<tr><td style="color: ${color}"><b>${name}</b></td><td><table>`;
-            for (const title of groupedData[name].titles) {
-              tableHtml += `<tr><td>${title}</td></tr>`;
+            // for (const title of groupedData[name].titles) {
+            //   // const count = (title.match(new RegExp(query, "g")) || []).length;
+            //   // const width = ((count - minCount) / (maxCount - minCount)) * 100;
+            //   tableHtml += `<tr style="background: linear-gradient(to left, #3498db ${width / 2}%, transparent 0.6);"><td>${title}</td></tr>`;
+            // }
+            for (const abstract of groupedData[name].abstracts) {
+              const count = (abstract.match(new RegExp(query, "g")) || []).length;
+              const width = ((count - minCount) / (maxCount - minCount)) * 100;
+              console.log(query, width, count, minCount, maxCount);
+              tableHtml += `<tr style="background: linear-gradient(to left, #3498db66 ${width / 2}%, transparent 0);"><td>${abstract.slice(0, 100)}...</td></tr>`;
             }
             tableHtml += "</table></td></tr><tr><td colspan='2'><hr></td></tr>"; // Add horizontal line
           }
@@ -418,36 +500,68 @@
               .style("top", event.pageY - 28 + "px")
               .style(
                 "border",
-                `1px solid ${clusterColor(d.data[0].cluster.toString())}`,
+                `1px solid ${clusterColor(d.data[0].cluster.toString())}`
               )
-              .style("height", "300px")
+              .style("max-width", "300px")
+              .style("max-height", "300px")
               .style("overflow", "auto");
           }, 500);
         } else {
-          let titles = new Map<string, Data[]>();
+          let titles = new Map<string, any[]>();
 
           for (const scholar of d.data) {
-            const name = scholar.name;
-            const publications = scholar.data.map((p: any) => ({
-              title: p.title,
-              abstract: p.abstract.substring(0, 100), // Get the first 100 characters of the abstract
+            const name = scholar.AuthorName;
+            const publications = scholar.data.map((p: IEEEData) => ({
+              title: p.Title,
+              abstract:
+                p.Abstract.substring(0, 100) +
+                "..." +
+                p.Abstract.substring(p.Abstract.length - 100),
               cluster: p.cluster,
-            }));
+            })) as any[];
 
             // Sort the publications array by the cluster field
-            publications.sort((a: Data, b: Data) => a.cluster - b.cluster);
+            publications.sort((a: any, b: any) => a.cluster - b.cluster);
 
             titles.set(name, publications);
           }
+          const query = searchTerm.trim().toLowerCase();
+
+          let minCount = Infinity;
+          let maxCount = -Infinity;
+
+          for (const [name, publications] of titles) {
+            for (const { title, abstract } of publications) {
+              let count = (title.match(new RegExp(query, "g")) || []).length;
+              count += (abstract.match(new RegExp(query, "g")) || []).length;
+              minCount = Math.min(minCount, count);
+              maxCount = Math.max(maxCount, count);
+            }
+          }
+          console.log(query, minCount, maxCount);
           let tableHtml = "<table style='width: 100%; font-size: 10px;'>";
 
+          // for (const [name, publications] of titles) {
+          //   tableHtml += `<tr><td colspan="2" style="font-weight: bold;">${name}</td></tr>`;
+          //   tableHtml +=
+          //     "<tr><td colspan='2'><table style='width: 100%; font-size: 10px;'>";
+
+          //   for (const { title, abstract, cluster } of publications) {
+          //     tableHtml += `<tr><td style="color: ${clusterColor(cluster.toString())}">${title}</td><td style="font-size: 8px">${abstract}</td></tr>`;
+          //   }
+
+          //   tableHtml += "</table></td></tr><tr><td colspan='2'><hr></td></tr>";
+          // }
           for (const [name, publications] of titles) {
             tableHtml += `<tr><td colspan="2" style="font-weight: bold;">${name}</td></tr>`;
             tableHtml +=
               "<tr><td colspan='2'><table style='width: 100%; font-size: 10px;'>";
 
             for (const { title, abstract, cluster } of publications) {
-              tableHtml += `<tr><td style="color: ${clusterColor(cluster.toString())}">${title}</td><td style="font-size: 8px">${abstract}</td></tr>`;
+              let count = (title.match(new RegExp(query, "g")) || []).length;
+              count += (abstract.match(new RegExp(query, "g")) || []).length;
+              const width = ((count - minCount) / (maxCount - minCount)) * 100;
+              tableHtml += `<tr style="background: linear-gradient(to left, #3498db66 ${width / 2}%, transparent 0);"><td style="color: ${clusterColor(cluster.toString())}">${title}</td><td style="font-size: 8px">${abstract}</td></tr>`;
             }
 
             tableHtml += "</table></td></tr><tr><td colspan='2'><hr></td></tr>";
@@ -465,7 +579,8 @@
               .style("left", event.pageX - 10 + "px")
               .style("top", event.pageY - 28 + "px")
               .style("border", `1px solid #2C3E50`)
-              .style("height", "300px")
+              .style("max-width", "300px")
+              .style("max-height", "300px")
               .style("overflow", "auto");
           }, 500);
         }
@@ -492,7 +607,7 @@
               if (bins !== undefined) {
                 relatedPaperBins = relatedPaperBins.concat(bins);
                 relatedPaperBins = relatedPaperBins.filter(
-                  (item, index) => relatedPaperBins.indexOf(item) === index,
+                  (item, index) => relatedPaperBins.indexOf(item) === index
                 );
               }
             });
@@ -501,7 +616,7 @@
               if (
                 relatedPaperBins.some(
                   (relatedBin) =>
-                    !isScholarData(bin) && relatedBin.id === bin.id,
+                    !isScholarData(bin) && relatedBin.id === bin.id
                 )
               ) {
                 bin.selected = true;
@@ -520,20 +635,19 @@
               .append("line")
               .style("stroke", "black")
               .style("stroke-width", 0.75)
-              .attr("x1", (d) => d.source.x+d.source.width/2)
-              .attr("y1", (d) => d.source.y+d.source.height/2)
-              .attr("x2", (d) => d.target.x+d.target.width/2)
-              .attr("y2", (d) => d.target.y+d.target.height/2);
+              .attr("x1", (d) => d.source.x + d.source.width / 2)
+              .attr("y1", (d) => d.source.y + d.source.height / 2)
+              .attr("x2", (d) => d.target.x + d.target.width / 2)
+              .attr("y2", (d) => d.target.y + d.target.height / 2);
           }
         } else {
           selectedBins = selectedBins.filter((bin) => bin.id !== d.id);
-
         }
 
         selectedBins = Array.from(new Set(selectedBins));
 
         d3.selectAll(".rectBin").style("stroke", (d: any) =>
-          d.selected ? "#2C3E50" : "none",
+          d.selected ? "#2C3E50" : "none"
         );
       })
       .style("opacity", 0)
@@ -548,13 +662,13 @@
     scholarData: BinData[],
     width: number,
     height: number,
-    padding: number,
+    padding: number
   ): any[] {
     // Remove empty bins
-    binData = binData.filter((bin: any) => bin.data.length > 0);
+    binData = binData.filter((bin: any) => bin.data.length > 1);
     scholarData = scholarData.filter((scholar: any) => scholar.data.length > 0);
-    
-   binData.sort((a, b) => {
+
+    binData.sort((a, b) => {
       if (a.y === b.y) {
         return a.x - b.x;
       }
@@ -599,7 +713,6 @@
       d.y = (d.y - minY) / (maxY - minY);
     });
 
-
     width = window.innerWidth * 0.6 - margin.left - margin.right;
     // height using 100vh
     height = window.innerHeight * 0.9 - margin.top - margin.bottom;
@@ -614,7 +727,7 @@
     combinedData.forEach((bin: any) => {
       bin.width = binSizeX;
       bin.height = Math.min(binSizeX, binSizeY);
-      bin.x = padding + bin.x * (width+padding);
+      bin.x = padding + bin.x * (width + padding);
       bin.y = padding + bin.y * height;
     });
 
@@ -624,7 +737,7 @@
   function groupByCluster(binData: BinData[]): any[] {
     const clusterMap = new Map();
     for (const bin of binData) {
-      for (const point of bin.data) {
+      for (const point of bin.data as IEEEData[]) {
         if (!clusterMap.has(point.cluster)) {
           clusterMap.set(point.cluster, {
             cluster: point.cluster,
@@ -670,7 +783,7 @@
       });
       selectedBins = binData;
       d3.selectAll(".rectBin").style("stroke", (d: any) =>
-        d.selected ? "#2C3E50" : "none",
+        d.selected ? "#2C3E50" : "none"
       );
       isSelectAll = true;
     } else {
@@ -679,7 +792,7 @@
       });
       selectedBins = [];
       d3.selectAll(".rectBin").style("stroke", (d: any) =>
-        d.selected ? "#2C3E50" : "none",
+        d.selected ? "#2C3E50" : "none"
       );
 
       isSelectAll = false;
@@ -758,35 +871,20 @@
     if (query.length > 3) {
       if (scholarView) {
         // remove scholarView
-        const matchingScholars = scholarData.filter((scholar: ScholarData) => {
-          console.log(
-            scholar.name.toLowerCase().trim(),
-            query,
-            scholar.name.toLowerCase().trim().includes(query),
-          );
+        const matchingScholars = scholarData.filter(
+          (scholar: IEEEScholarData) => {
+            let searchableString = [
+              scholar.AuthorName.toLowerCase().trim(),
+            ].join(" ");
 
-          let searchableString = [
-            scholar.name.toLowerCase().trim(),
-            typeof scholar.faculty === "string"
-              ? scholar.faculty.toLowerCase().trim()
-              : "",
-            typeof scholar.department === "string"
-              ? scholar.department.toLowerCase().trim()
-              : "",
-            typeof scholar.area_of_focus === "string"
-              ? scholar.area_of_focus.toLowerCase().trim()
-              : "",
-          ].join(" ");
-
-          return searchableString.includes(query);
-        });
+            return searchableString.includes(query);
+          }
+        );
 
         filteredScholars = matchingScholars;
-        console.log(matchingScholars);
         d3.selectAll(".rectBin").style("fill-opacity", 0.05);
         d3.selectAll(".rectBin")
           .filter((d: any) => {
-            console.log(d.data);
             return d.data.some((item: any) => matchingScholars.includes(item));
           })
           .transition()
@@ -795,14 +893,20 @@
       } else {
         const matchingBins = binData.filter((bin: BinData) => {
           const binData = bin.data;
-          for (const data of binData) {
-            if ("cluster" in data) {
+          for (const data of binData as IEEEData[] | IEEEScholarData[]) {
+            if ("AuthorName" in data) {
               if (
-                data.email.toLowerCase().includes(query) ||
-                data.first_name.toLowerCase().includes(query) ||
-                data.last_name.toLowerCase().includes(query) ||
-                data.title.toLowerCase().includes(query) ||
-                data.abstract.toLowerCase().includes(query)
+                data.AuthorName.toLowerCase().includes(query) ||
+                data.AuthorAffiliation.toLowerCase().includes(query)
+              ) {
+                return true;
+              }
+            } else {
+              if (
+                data.Title.toLowerCase().includes(query) ||
+                data.Abstract.toLowerCase().includes(query) ||
+                data.AuthorNames.toLowerCase().includes(query) ||
+                data.AuthorAffiliation.toLowerCase().includes(query)
               ) {
                 return true;
               }
@@ -823,34 +927,40 @@
   };
 
   const handleBinsNumChange = async () => {
-    binData = constructBinData(data);
-    scholarData = getScholarData(binData) as ScholarData[];
+    binData = constructBinData(ieeeData);
+    scholarData = getScholarData(binData) as IEEEScholarData[];
     let scholarBinData = constructScholarBinData(scholarData);
     binData = adjustBins(binData, scholarBinData, width, height, 50);
+    // binData = binData.concat(scholarBinData);
     redraw();
   };
 
-  const getScholarData = (binData: BinData[]): ScholarData[] => {
+  const getScholarData = (binData: BinData[]): IEEEScholarData[] => {
     const scholarData = {} as any;
     scholarMap = new Map<string, BinData[]>();
 
     binData.forEach((bin) => {
       bin.data.forEach((p: any) => {
-        const name = `${p.first_name} ${p.last_name}`;
+        // const name = `${p.first_name} ${p.last_name}`;
+        const name = p.AuthorNames.split(";")[0];
+        const affiliation = p.AuthorAffiliation.split(";")[0];
+
         if (!scholarData[name]) {
           scholarData[name] = {
-            id: p.author_id,
-            name: name,
+            // id: p.author_id,
+            // name: name,
             x: 0,
             y: 0,
-            faculty: p.faculty,
-            department: p.department,
-            area_of_focus: p.area_of_focus,
-            gs_link: p.gs_link,
-            author_id: p.author_id,
-            email: p.email,
+            // faculty: p.faculty,
+            // department: p.department,
+            // area_of_focus: p.area_of_focus,
+            // gs_link: p.gs_link,
+            // author_id: p.author_id,
+            // email: p.email,
             data: [],
             count: 0,
+            AuthorName: name,
+            AuthorAffiliation: affiliation,
           };
         }
         scholarData[name].x += p.umap_x;
@@ -868,7 +978,14 @@
     // Calculate mean umap_x and umap_y
     for (const name in scholarData) {
       scholarData[name].x /= scholarData[name].count;
-      scholarData[name].y /= scholarData[name].count;
+      scholarData[name].y /= scholarData[name].count + 1.5;
+    }
+    // console.log(scholarData, scholarMap);
+    // filter scholars with less than 2 papers
+    for (const name in scholarData) {
+      if (scholarData[name].count < 3) {
+        delete scholarData[name];
+      }
     }
 
     return Object.values(scholarData);
@@ -877,18 +994,17 @@
   function handleHighlightReferences(event: CustomEvent) {
     const references = event.detail as RefereneceType[];
     const paperIds = references.map((r) => r.paper_id);
-    console.log(references, paperIds);
 
     d3.selectAll(".rectBin").style("fill-opacity", 0.05);
     d3.selectAll(".rectBin")
       .filter((d: any) => {
         if ("cluster" in d.data[0]) {
           return d.data.some((p: Data) =>
-            paperIds.includes(p.paper_id.toString()),
+            paperIds.includes(p.paper_id.toString())
           );
         } else {
           return d.data.some((s: ScholarData) =>
-            s.data.some((p: Data) => paperIds.includes(p.paper_id.toString())),
+            s.data.some((p: Data) => paperIds.includes(p.paper_id.toString()))
           );
         }
       })
@@ -906,7 +1022,7 @@
           return d.data.some((p: Data) => p.paper_id.toString() === paperId);
         } else {
           return d.data.some((s: ScholarData) =>
-            s.data.some((p: Data) => p.paper_id.toString() === paperId),
+            s.data.some((p: Data) => p.paper_id.toString() === paperId)
           );
         }
       })
@@ -917,18 +1033,22 @@
   async function loadData() {
     userId = localStorage.getItem("userId") as string;
     const dataFrame = await fetch(`http://localhost:8000/data`).then((res) =>
-      res.json(),
+      res.json()
     );
 
-    data = dataFrame.df;
-    binData = constructBinData(data);
-    scholarData = getScholarData(binData) as ScholarData[];
+    // wait two seconds for the data to be loaded
+    // await new Promise((resolve) => setTimeout(resolve, 10000));
+
+    ieeeData = dataFrame.df;
+    binData = constructBinData(ieeeData);
+    scholarData = getScholarData(binData) as IEEEScholarData[];
     let scholarBinData = constructScholarBinData(scholarData);
     binData = adjustBins(binData, scholarBinData, width, height, 50);
+    // binData = binData.concat(scholarBinData);
   }
 
   function isScholarData(d: any): boolean {
-    return "name" in d.data[0];
+    return "AuthorName" in d.data[0];
   }
 
   if (browser) {
@@ -937,7 +1057,7 @@
         longTermVis.clientWidth,
         longTermVis.clientHeight,
         width,
-        height,
+        height
       );
       width = longTermVis.clientWidth;
       await loadData();
@@ -963,17 +1083,41 @@
         />
         <!-- <button on:click={handleSemanticRetrieval}>Search</button> -->
 
-        <label for="binsNum">Bins number:</label>
-        <input
-          type="range"
-          id="binsNum"
-          name="binsNum"
-          min="10"
-          max="39"
-          step="2"
-          bind:value={binsNum}
-        />
-        <span class="indicator">{binsNum}</span>
+        <div class="slider-container">
+          <label for="binsNum" class="label-small">Bins number:</label>
+          <input
+            type="range"
+            id="binsNum"
+            name="binsNum"
+            min="10"
+            max="39"
+            step="2"
+            bind:value={binsNum}
+          />
+          <span class="indicator">{binsNum}</span>
+        </div>
+
+        <div class="year-inputs">
+          <input
+            type="number"
+            id="minYear"
+            name="minYear"
+            min="1990"
+            max="2022"
+            class="year-input"
+            bind:value={minYear}
+          />
+          <span class="year-separator">-</span>
+          <input
+            type="number"
+            id="maxYear"
+            name="maxYear"
+            min="1990"
+            max="2022"
+            class="year-input"
+            bind:value={maxYear}
+          />
+        </div>
 
         <!-- <label for="clusterNum">Cluster number:</label> -->
         <!-- <input
@@ -1119,6 +1263,31 @@
     opacity: 0;
     width: 0;
     height: 0;
+  }
+
+  .label-small {
+    font-size: 0.8em;
+    display: block;
+    text-align: center;
+  }
+  .slider-container {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .year-inputs {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .year-input {
+    width: 60px;
+    margin: 0 10px;
+    text-align: center;
+  }
+  .year-separator {
+    margin: 0 5px;
   }
 
   .slider {
