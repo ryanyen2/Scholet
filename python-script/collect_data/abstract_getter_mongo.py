@@ -60,6 +60,9 @@ class GoogleScholarScrapper:
 
         if description:
             description = description.get_text()
+        else:
+            html_content_pretty = soup.prettify()
+            print(html_content_pretty)
 
         time.sleep(random.randint(10, 15))  # Random delay between 10 to 15 seconds
         return str(description)
