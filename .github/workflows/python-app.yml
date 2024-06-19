@@ -1,0 +1,35 @@
+name: Run data update script
+
+on:
+  # once a week
+  schedule:
+    - cron: "0 0 * * 0"
+
+jobs:
+  run-python-script:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.8"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests beautifulsoup4 pandas openpyxl tqdm playwright lxml firebase_admin "pymongo[srv]"
+          playwright install
+
+      - name: Collect google scholar profile data
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          API_KEY_SEMANTIC_SCHOLAR: ${{ secrets.API_KEY_SEMANTIC_SCHOLAR}}
+        run: |
+          python python-script/collect_data/gs_profile_scraper_mongo.py
+          python python-script/collect_data/abstract_getter_mongo.py
