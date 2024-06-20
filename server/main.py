@@ -1,32 +1,20 @@
-import uvicorn
-import sys
-import os
 import json
 import numpy as np
 
 from fastapi import FastAPI
-from fastapi import Response
-# from fastapi.responses import FileResponse
-# from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv  
 from pydantic import BaseModel
-from typing import Any, List, Optional
+from typing import Any, List
 
-from utils.rag import retrieval, RAG
+from utils.rag import retrieval
 from utils.data import data_store
 from datetime import datetime
-from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse, RedirectResponse
+from fastapi.responses import StreamingResponse
 
 import nltk
 nltk.download('punkt')
 import asyncio
-
-
 from utils.client_setup import client
-from langchain_openai import OpenAI
-
-
 
 
 app = FastAPI()
@@ -46,7 +34,6 @@ app.add_middleware(
 
 messages_history = []
 
-# Say "information is missing on" followed by the related topic, if the given context do not provide sufficient information to the question; but if it's prompt for a task, complete the task.
 _rag_query_text = """
 You are an AI assistant helps answering users' questions about scholars and their papers. 
 You are given a user question, and please write clean, concise and accurate answer to the question like what are the related research being done. 
@@ -61,15 +48,6 @@ Here are the set of contexts:
 {context}
 
 Remember, don't blindly repeat the contexts verbatim. And here is the user question:
-"""
-
-_summarize_prompt = """
-You are a large language AI assistant that describe what are the main points of the given contexts.
-You will be given a set of contexts from past conversations between users and AI, please reason the usages of each contexts and aggregate them concisely.
-Start with: "These memories are related to the following topics:\n" and list the topics that are related to the contexts extermely concisely.
-
-Related Contexts:
-{context}
 """
 
 
@@ -95,9 +73,6 @@ New lines of conversation:
 
 New summary:"""
 
-
-
-# app.mount("/assets", StaticFiles(directory="public/assets"), name="static")
 
 class DataResponse(BaseModel):
     df: list[dict[str, Any]]
@@ -232,35 +207,3 @@ async def rag(message_request: MessageRequest):
             print("OpenAI Response (Streaming) Error: " + str(e))
     
     return StreamingResponse(response_stream(), media_type="text/event-stream")
-
-
-class SummarizeRequest(BaseModel):
-    context: List[str]
-    
-
-@app.post("/summarize")
-async def summarize(message_request: SummarizeRequest):
-    context = message_request.context
-    
-    contextText = "\n".join(context)
-    
-    async def response_stream():
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": _summarize_prompt.format(context=contextText)}
-            ],
-            max_tokens=1024,
-            temperature=0.1,
-            stream=True,
-        )
-        try:
-            for chunk in response:
-                current_content = chunk.choices[0].delta.content
-                yield f"{current_content if current_content else ''} "
-                await asyncio.sleep(0.01)
-        except Exception as e:
-            print("OpenAI Response (Streaming) Error: " + str(e))
-
-    return StreamingResponse(response_stream(), media_type="text/event-stream")
-    # return {"summary": completion.choices[0].message.content}

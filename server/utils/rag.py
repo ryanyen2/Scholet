@@ -1,17 +1,9 @@
-import os
-import pandas as pd
 import numpy as np
 from sentence_transformers import SentenceTransformer
-import requests
 from fastapi import HTTPException
-from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
-import httpx
 import re
 import json
-from openai import OpenAI
-from typing import Annotated, List, Generator, Optional
-# import leptonai
-# from leptonai.util import tool
+from typing import Annotated, List
 
 from utils.client_setup import client
 from utils.data import data_store
@@ -197,11 +189,9 @@ def determine_top_k(scores):
     # Calculate the differences between consecutive scores
     differences = [scores[i] - scores[i+1] for i in range(len(scores) - 1)]
     differences = [abs(diff) for diff in differences]
-
-    # Calculate the standard deviation of the differences
     threshold = np.std(differences) * 0.8
 
-    # Find the index of the first difference that is greater than the threshold
+
     k = next((i for i, diff in enumerate(differences) if diff > threshold), len(scores))
     k = np.clip(k, 5, 12)
     return k
@@ -235,7 +225,6 @@ def retrieval(query):
     
     
 async def RAG(prompt, context):
-    # TODO: Add the ability to pass in the context and prompt
     system_prompt = _rag_query_text.format(
         context="\n\n".join(
             [f"[[citation:{c['id']}]] {c['text']}" for i, c in enumerate(context)]

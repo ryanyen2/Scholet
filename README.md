@@ -1,7 +1,7 @@
-# AI Institute Visualization
+# Scholet
 
 ## Basic Idea
-The project is a visualization of the AI Institute at the University of Waterloo. The visualization will be interactive and will allow users to explore the institute's research and collaborations in a variety of ways. The visualization will be built using Svelte and D3.js.
+The project is a visualization of the scholar/publications. The visualization will be interactive and will allow users to explore the community's research and collaborations in a variety of ways. The visualization was built with Svelte and D3.js.
 
 
 ## Project Structure
@@ -11,6 +11,22 @@ The project is structured as follows:
   - `types` contains the typescript types
   - `static` contains the data
 - `python-script` contains the python scripts for data processing, vectorization, 2d projection, and clustering
+
+### Sever Side File Structure:
+We used python, fastapi, and uvicorn to serve the data to the frontend. The server is running on `http://localhost:8000` and the frontend is running on `http://localhost:5173`. The server is responsible for serving the data to the frontend and processing the data.
+make sure you include the `.env` file with: `OPENAI_API_KEY=YOUR_API_KEY`
+```bash
+server/
+├── main.py
+├── requirements.txt
+|── .env
+|── data/
+└── utils/
+    ├── __init__.py
+    ├── rag.py
+    ├── data.py
+    └── client_setup.py
+```
 
 
 ## Data
@@ -62,6 +78,30 @@ npm run dev
 # or start the server and open the app in a new browser tab
 npm run dev -- --open
 ```
+
+### Server Side
+Now let's create a virtual environment and install the dependencies:
+1. **Create a new conda environment**
+
+   Open your terminal and run the following command to create a new conda environment:
+
+   ```sh
+   conda create --name myenv python=3.9
+    ```
+    Replace `myenv` with the name you want to give your environment.
+
+2. Activate the conda environment with 
+    ```sh
+    conda activate myenv
+    conda install pip
+    ```
+
+3. Install Dependencies & Run
+    ```bash
+    cd server
+    pip install -r requirements.txt
+    uvicorn main:app --port=8000 --reload
+    ```
 
 ## Building
 
