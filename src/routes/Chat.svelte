@@ -1,7 +1,12 @@
 <script lang="ts">
   import * as d3 from "d3";
   import { createEventDispatcher } from "svelte";
-  import type { RefereneceType, BinData, ScholarData } from "../types/type.js";
+  import type {
+    RefereneceType,
+    BinData,
+    ScholarData,
+    Data,
+  } from "../types/type.js";
   import Citation from "./Citation.svelte";
 
   const dispatch = createEventDispatcher();
@@ -138,29 +143,59 @@
       const id = match[1];
 
       let bin: BinData | undefined;
-      if ("cluster" in binData[0].data[0]) {
-        bin = binData.find((d: any) => {
-          return d.data.some((data: any) => data.paper_id.toString() === id);
-        });
-      } else {
-        bin = binData.find((d: any) => {
-          return d.data.some((scholar: ScholarData) =>
-            scholar.data.some((p: any) => p.paper_id.toString() === id),
-          );
-        });
-      }
-      if (bin) {
-        const clusterCounts: { [cluster: string]: number } = {};
-        bin.data.forEach((p: any) => {
-          const cluster = p.cluster.toString();
-          if (cluster in clusterCounts) {
-            clusterCounts[cluster]++;
+      // if ("cluster" in binData[0].data[0]) {
+      //   bin = binData.find((d: any) => {
+      //     return d.data?.some((data: any) => data.paper_id.toString() === id);
+      //   });
+      // } else {
+      //   bin = binData.find((d: any) => {
+      //     return d.data.some((scholar: ScholarData) =>
+      //       scholar.data.some((p: any) => p.paper_id.toString() === id)
+      //     );
+      //   });
+      // }
+
+      bin = binData.find((d: BinData) => {
+        // data: (ScholarData | Data)[]
+        return d.data.some((data: ScholarData | Data) => {
+          if ("paper_id" in data) {
+            return data.paper_id.toString() === id;
           } else {
-            clusterCounts[cluster] = 1;
+            return data.data.some((p: any) => p.paper_id.toString() === id);
           }
         });
+      });
+
+      if (bin) {
+        const clusterCounts: { [cluster: string]: number } = {};
+        console.log(bin.data);
+        bin.data.forEach((p: any) => {
+          if ("cluster" in p) {
+            const cluster = p.cluster.toString();
+            if (cluster in clusterCounts) {
+              clusterCounts[cluster]++;
+            } else {
+              clusterCounts[cluster] = 1;
+            }
+          } else {
+            p.data.forEach((p: any) => {
+              const cluster = p.cluster.toString();
+              if (cluster in clusterCounts) {
+                clusterCounts[cluster]++;
+              } else {
+                clusterCounts[cluster] = 1;
+              }
+            });
+          }
+          // const cluster = p.cluster.toString();
+          // if (cluster in clusterCounts) {
+          //   clusterCounts[cluster]++;
+          // } else {
+          //   clusterCounts[cluster] = 1;
+          // }
+        });
         const sortedClusters = Object.entries(clusterCounts).sort(
-          (a, b) => b[1] - a[1],
+          (a, b) => b[1] - a[1]
         );
 
         let offset = 0;

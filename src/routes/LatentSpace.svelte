@@ -420,6 +420,7 @@
                 "border",
                 `1px solid ${clusterColor(d.data[0].cluster.toString())}`,
               )
+              .style("max-width", "200px")
               .style("height", "300px")
               .style("overflow", "auto");
           }, 500);
@@ -466,6 +467,7 @@
               .style("top", event.pageY - 28 + "px")
               .style("border", `1px solid #2C3E50`)
               .style("height", "300px")
+              .style("max-width", "200px")
               .style("overflow", "auto");
           }, 500);
         }
