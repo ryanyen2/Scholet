@@ -10,3 +10,10 @@ node_modules
 .output
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+server/**/__pycache__/
+server/.venv/
+server/.env
+server/.env.*
+server/.DS_Store
+server/__pycache__/
