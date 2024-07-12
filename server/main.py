@@ -1,12 +1,13 @@
 import json
 import numpy as np
+import re
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Any, List
 
-from utils.rag import retrieval
+from utils.rag import enhanced_retrieval, retrieval
 from utils.data import data_store
 from datetime import datetime
 from fastapi.responses import StreamingResponse
@@ -73,7 +74,24 @@ New lines of conversation:
 
 New summary:"""
 
+database_query_prompt = """Extract the following information from the text:
 
+1. Authors
+2. Papers
+3. Awards
+4. Years
+
+Please provide the extracted information in the form of several sets of lists, one for each category. Here is the text:
+
+Example queries and results:
+
+Find papers by John Doe and Jane Smith on neural networks. Provide the information in the format shown below:
+
+Authors: ["John Doe", "Jane Smith"]
+Papers: ["Advances in AI Research"]
+Awards: ["Best Paper Award"]
+Years: ["2022"]
+"""
 class DataResponse(BaseModel):
     df: list[dict[str, Any]]
     date: str
@@ -175,8 +193,8 @@ async def rag(message_request: MessageRequest):
         global messages_history
         
         response = client.chat.completions.create(
-            # model="gpt-3.5-turbo",
-            model="gpt-4-turbo-preview",
+            model="gpt-3.5-turbo",
+            # model="gpt-4-turbo-preview",
             messages= messages_history + [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt},
@@ -207,3 +225,34 @@ async def rag(message_request: MessageRequest):
             print("OpenAI Response (Streaming) Error: " + str(e))
     
     return StreamingResponse(response_stream(), media_type="text/event-stream")
+
+@app.post("/preprocess")
+async def preprocess(message_request: MessageRequest): 
+    prompt = message_request.prompt
+
+    response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            # model="gpt-4-turbo-preview",
+            messages= messages_history + [
+                {"role": "system", "content": database_query_prompt},
+                {"role": "user", "content": prompt},
+            ],
+            max_tokens=4096,
+            temperature=1,
+            stream=True,
+        )
+    
+    assistant_message = ""
+    try:
+        for chunk in response:
+            current_content = chunk.choices[0].delta.content
+            assistant_message += f"{current_content if current_content else ''}"
+
+        result = enhanced_retrieval(assistant_message)
+
+
+    except Exception as e:
+        print("OpenAI Response (Streaming) Error: " + str(e))
+    
+    
+    return json.dumps(result, default=str)

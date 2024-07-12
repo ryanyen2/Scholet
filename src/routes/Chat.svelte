@@ -70,7 +70,6 @@
       queryWithSelected += " " + paperIds.map((id) => `[[P:${id}]]`).join(" ");
     }
 
-
     await fetch("http://localhost:8000/retrieval", {
       method: "POST",
       headers: {
@@ -86,8 +85,7 @@
 
     dispatch("retrievedReferences", references);
 
-    // context = [{id: "paper_id", text: "abstract"}]
-    const context = references.map((ref) => {
+    let context = references.map((ref) => {
       return {
         id: ref.paper_id,
         author: ref.name,
@@ -95,6 +93,29 @@
         text: ref.Abstract,
       };
     });
+
+   const relatedData = await fetch("http://localhost:8000/preprocess", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ prompt: query, context }),
+    }).then((res) => res.json())
+      .then((data) => {
+        data = JSON.parse(data);
+        references = [...data];
+      });
+
+    dispatch("retrievedReferences", references);
+    context = references.map((ref) => {
+      return {
+        id: ref.paper_id,
+        author: ref.name,
+        title: ref.Title,
+        text: ref.Abstract,
+      };
+    });
+    // context = [{id: "paper_id", text: "abstract"}]
 
     answer = "Synthesizing Information...";
     const res = await fetch("http://localhost:8000/rag", {

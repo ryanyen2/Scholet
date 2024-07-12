@@ -246,3 +246,61 @@ async def RAG(prompt, context):
     citations_objects = [{'id': c['id'], 'content': c['text']} for c in context]
     
     return {"response": llm_response.choices[0].message.content, "citations": citations_objects}
+
+
+def parse_response(response_text):
+    # Define patterns to extract each category
+    author_pattern = r'Authors:\s*\[(.*?)\]'
+    paper_pattern = r'Papers:\s*\[(.*?)\]'
+    award_pattern = r'Awards:\s*\[(.*?)\]'
+    year_pattern = r'Years:\s*\[(.*?)\]'
+
+    # Extract lists from response_text using regular expressions
+    authors_match = re.search(author_pattern, response_text, re.DOTALL)
+    papers_match = re.search(paper_pattern, response_text, re.DOTALL)
+    awards_match = re.search(award_pattern, response_text, re.DOTALL)
+    years_match = re.search(year_pattern, response_text, re.DOTALL)
+
+    # Convert matched strings to actual lists
+    authors = [item.strip().strip('"') for item in authors_match.group(1).split(',')] if authors_match and authors_match.group(1) else []
+    papers = [item.strip().strip('"') for item in papers_match.group(1).split(',')] if papers_match and papers_match.group(1) else []
+    awards = [item.strip().strip('"') for item in awards_match.group(1).split(',')] if awards_match and awards_match.group(1) else []
+    years = [item.strip().strip('"') for item in years_match.group(1).split(',')] if years_match and years_match.group(1) else []
+
+    return authors, papers, awards, years
+
+def enhanced_retrieval(query):
+    # Extract lists from the query using regular expressions
+    authors, papers, awards, years = parse_response(query)
+    
+    # Get the DataFrame
+    embeddings_df = data_store.get_data()
+    
+    # Convert all author names to lowercase for case-insensitive matching
+    embeddings_df['researchers'] = embeddings_df['AuthorNames'].str.lower()
+
+    # Convert extracted lists to lowercase
+    authors = [author.lower() for author in authors]
+    papers = [paper.lower() for paper in papers]
+    awards = [award.lower() for award in awards]
+    years = [year.lower() for year in years]
+
+    # Filter the DataFrame based on the extracted lists
+    filtered_df = embeddings_df[
+        embeddings_df['researchers'].apply(lambda x: any(author in x for author in authors)) |
+        embeddings_df['Title'].str.lower().apply(lambda x: any(paper in x for paper in papers)) |
+        embeddings_df['Award'].str.lower().apply(lambda x: any(award in x for award in awards)) |
+        embeddings_df['Year'].astype(str).apply(lambda x: any(year in x for year in years))
+    ] if len(authors) > 0 or len(papers) > 0 or len(awards) > 0 or len(years) > 0 else embeddings_df
+
+    # Raise an HTTPException if no results are found
+    if len(filtered_df) == 0:
+        raise HTTPException(status_code=404, detail="No results found for the given query.")
+
+    # Convert the embeddings column to a matrix
+    matrix = np.array(filtered_df['embeddings'].tolist())
+
+    # Compute the fused results
+    top_results = compute_fused_results(query, matrix, filtered_df, generate_queries=False)
+    
+    return top_results
