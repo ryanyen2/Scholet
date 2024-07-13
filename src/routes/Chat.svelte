@@ -117,7 +117,7 @@
       };
     });
     // context = [{id: "paper_id", text: "abstract"}]
-
+    console.log("assistant message ", context)
     answer = "Synthesizing Information...";
     const res = await fetch("http://localhost:8000/rag", {
       method: "POST",
