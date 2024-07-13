@@ -106,6 +106,7 @@
         references = [...data];
       });
 
+    
     dispatch("retrievedReferences", references);
     context = references.map((ref) => {
       return {

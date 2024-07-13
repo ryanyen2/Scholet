@@ -74,23 +74,42 @@ New lines of conversation:
 
 New summary:"""
 
-database_query_prompt = """Extract the following information from the text:
+database_query_prompt = """I have a pandas DataFrame with the following columns:
+- Conference
+- Year
+- Title
+- DOI
+- Link
+- FirstPage
+- LastPage
+- PaperType
+- Abstract
+- AuthorNames-Deduped
+- AuthorNames
+- AuthorAffiliation
+- InternalReferences
+- AuthorKeywords
+- AminerCitationCount
+- CitationCount_CrossRef
+- PubsCited_CrossRef
+- Downloads_Xplore
+- Award
+- GraphicsReplicabilityStamp
+- embeddings
+- umap_x
+- umap_y
+- cluster
+- top_keywords
 
-1. Authors
-2. Papers
-3. Awards
-4. Years
+Example user query: "Find any researchers doing works related to aviation."
 
-Please provide the extracted information in the form of several sets of lists, one for each category. Here is the text:
+Expected output:
+```script
+1. [[Abstract]]: [["aviation"]]
+```
 
-Example queries and results:
+In your answer, analyze the natural language and relate to the database format, to identify/extract the important information from the user query and output the logical query steps to generate the database search and you should strictly follow the pattern `[[column_name]]:` followed by the specific details, such as keywords, values, or other relevant information. For example, `[[AuthorNames]]: [["author1", "author2", "author3"]]`. The below is the user query you should respond to:
 
-Find papers by John Doe and Jane Smith on neural networks. Provide the information in the format shown below:
-
-Authors: ["John Doe", "Jane Smith"]
-Papers: ["Advances in AI Research"]
-Awards: ["Best Paper Award"]
-Years: ["2022"]
 """
 class DataResponse(BaseModel):
     df: list[dict[str, Any]]
@@ -230,10 +249,11 @@ async def rag(message_request: MessageRequest):
 async def preprocess(message_request: MessageRequest): 
     prompt = message_request.prompt
 
+    
     response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             # model="gpt-4-turbo-preview",
-            messages= messages_history + [
+            messages= [
                 {"role": "system", "content": database_query_prompt},
                 {"role": "user", "content": prompt},
             ],
@@ -243,16 +263,17 @@ async def preprocess(message_request: MessageRequest):
         )
     
     assistant_message = ""
+    result = ""
     try:
         for chunk in response:
             current_content = chunk.choices[0].delta.content
             assistant_message += f"{current_content if current_content else ''}"
 
         result = enhanced_retrieval(assistant_message)
-
+        return json.dumps(result, default=str)
 
     except Exception as e:
         print("OpenAI Response (Streaming) Error: " + str(e))
     
     
-    return json.dumps(result, default=str)
+    return ""
