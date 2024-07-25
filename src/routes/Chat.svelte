@@ -94,30 +94,16 @@
       };
     });
 
-   const relatedData = await fetch("http://localhost:8000/preprocess", {
+   const relatedQueries =  await fetch("http://localhost:8000/preprocess", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ prompt: query, context }),
-    }).then((res) => res.json())
-      .then((data) => {
-        data = JSON.parse(data);
-        references = [...data];
-      });
+    });
 
     
-    dispatch("retrievedReferences", references);
-    context = references.map((ref) => {
-      return {
-        id: ref.paper_id,
-        author: ref.name,
-        title: ref.Title,
-        text: ref.Abstract,
-      };
-    });
-    // context = [{id: "paper_id", text: "abstract"}]
-    console.log("assistant message ", context)
+
     answer = "Synthesizing Information...";
     const res = await fetch("http://localhost:8000/rag", {
       method: "POST",

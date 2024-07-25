@@ -1,9 +1,10 @@
+
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from fastapi import HTTPException
 import re
 import json
-from typing import Annotated, List
+from typing import Annotated, List, get_type_hints
 
 from utils.client_setup import client
 from utils.data import data_store
@@ -49,7 +50,7 @@ def generate_queries_chatgpt(original_query):
     return generated_queries
 
 
-def generate_queries(original_query):
+def generate_query(original_query, context):
     """
     Generate related questions based on the original question and the context.
     """
@@ -71,38 +72,32 @@ def generate_queries(original_query):
         
         pass
 
+    message = ""
     try:
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {
-                    "role": "system",
-                    "content": _generate_more_queries_prompt
-                },
-                {
-                    "role": "user",
-                    "content": f"{original_query}",
-                },
+                {"role": "system", "content": context},
+                {"role": "user", "content": _rag_query_text.format(context=context) + original_query},
             ],
-            tools=[{
-                "type": "function",
-                "function": tool.get_tools_spec(ask_related_questions),
-            }],
+            # tools=[{
+            #     "type": "function",
+            #     "function": tool.get_tools_spec(ask_related_questions),
+            # }],
             max_tokens=512,
+            stream=True,
         )
-        
-        print(f"Generated related questions: {response.choices[0].message.tool_calls[0].function.arguments}")
-        related = response.choices[0].message.tool_calls[0].function.arguments
-        if isinstance(related, str):
-            related = json.loads(related)
-        
-        return related["queries"][:]
-    
-    except Exception as e:
-        # For any exceptions, we will just return an empty list.
-        print(f"encountered error while generating related questions:\n{e}")
-        return []
 
+        for chunk in response:
+            current_content = chunk.choices[0].delta.content
+            message += f"{current_content if current_content else ''}"
+            
+        return message
+
+    except Exception as e:
+        # For any exceptions, return None.
+        print(f"Encountered an error while generating related questions:\n{e}")
+        return None
 
 
 def reciprocal_rank_fusion(search_results_dict, df, k=60):

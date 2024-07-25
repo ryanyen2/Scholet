@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Any, List
 
-from utils.rag import enhanced_retrieval, retrieval
+from utils.rag import enhanced_retrieval, generate_query, retrieval
 from utils.data import data_store
 from datetime import datetime
 from fastapi.responses import StreamingResponse
@@ -74,18 +74,16 @@ New lines of conversation:
 
 New summary:"""
 
-database_query_prompt = """You are an assistant that answers questions related to academic research topics. You have at most three chances to generate the expected response. In each attempt, you can ask me to provide more information by detailing the query steps from the database as instructions listed below.
+database_query_prompt = """You are an assistant that answers questions related to academic research topics.
 
 User Query: The user will ask a question related to academic research topics.
 
 If you need more information from the user, respond with a query like this:
 
-###Query###
 [[column_name]]: [["value1", "value2", ...]]
 
 Example:
 
-###Query###
 [[AuthorNames]]: [["John Doe", "Jane Smith"]]
 
 Note that the values in the query should be based on the user query and the database columns. The databse columns are:
@@ -116,78 +114,21 @@ Note that the values in the query should be based on the user query and the data
 - cluster
 - top_keywords
 
-If you have enough information to provide the final answer, respond directly with the answer without including "###Query###".
-
-Instructions:
-
-1. Understand the user query and identify relevant columns and values in the database.
-2. If necessary, ask for more information using the "###Query###" format to specify which columns and values are needed.
-3. Provide the final answer if you have all the required information.
-
 Example User Query: "Find papers related to neural networks by John Doe."
 
-Example Output if more information is needed:
+Example Output:
 
-###Query###
 [[AuthorNames]]: [["John Doe"]]
 [[Abstract]]: [["neural networks"]]
 
-Example Output if enough information is available to answer:
-
-The paper titled "Neural Network Applications" by John Doe was published in 2021. It explores various applications of neural networks in different fields.
-
 Example User Query: "Find papers related to neural networks by John Doe."
 
-Example Output if more information is needed:
+Example Output:
 
-###Query###
 [[AuthorNames]]: [["John Doe"]]
 [[Abstract]]: [["neural networks"]]
-
-Example Output if enough information is available to answer:
-
-The paper titled "Neural Network Applications" by John Doe was published in 2021. It explores various applications of neural networks in different fields.
-
-Note that you do not need to use up all three queries, as long as you got enough information, directly output the answer, do not do any irrelavent queries. Below is the user query you should respond to:
-
 """
 
-query_prompt = """I have a pandas DataFrame with the following columns:
-- Conference
-- Year
-- Title
-- DOI
-- Link
-- FirstPage
-- LastPage
-- PaperType
-- Abstract
-- AuthorNames-Deduped
-- AuthorNames
-- AuthorAffiliation
-- InternalReferences
-- AuthorKeywords
-- AminerCitationCount
-- CitationCount_CrossRef
-- PubsCited_CrossRef
-- Downloads_Xplore
-- Award
-- GraphicsReplicabilityStamp
-- embeddings
-- umap_x
-- umap_y
-- cluster
-- top_keywords
-
-Example user query: "Find any researchers doing works related to aviation."
-
-Expected output:
-###QUERY###
-1. [[Abstract]]: [["aviation"]]
-
-In your answer, analyze the natural language and relate to the database format, to identify/extract the important information from the user query and output the logical query steps to generate the database search and you should strictly follow the pattern `[[column_name]]:` followed by the specific details, such as keywords, values, or other relevant information. For example, `[[AuthorNames]]: [["author1", "author2", "author3"]]`. The below is the user query you should respond to:
-
-"""
 class DataResponse(BaseModel):
     df: list[dict[str, Any]]
     date: str
@@ -326,40 +267,36 @@ async def rag(message_request: MessageRequest):
 async def preprocess(message_request: MessageRequest): 
     prompt = message_request.prompt
 
+    # Initialize the message variable
     message = ""
-    for i in range(3):
-        response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                # model="gpt-4-turbo-preview",
-                messages= [
-                    {"role": "system", "content": database_query_prompt},
-                    {"role": "user", "content": prompt},
-                ],
-                max_tokens=4096,
-                temperature=1,
-                stream=True,
-            )
-        
-        try:
-            for chunk in response:
-                current_content = chunk.choices[0].delta.content
-                message += f"{current_content if current_content else ''}"
-            
-            if "###Query###" in message and i < 2:
-                print("##query", message)
-                prompt = enhanced_retrieval(message)
-                result=json.dumps(prompt, default=str)
-                def convert_to_native(obj):
-                    if isinstance(obj, np.generic):
-                        return obj.item()
-                    return obj
-                
-                converted_data = [{k: convert_to_native(v) for k, v in item.items()} for item in prompt]
-                prompt = json.dumps(converted_data, indent=2)
-            else:
-                break
 
-        except Exception as e:
-            print("OpenAI Response (Streaming) Error: " + str(e))
+    try:
+        # Get the streaming response from the OpenAI API
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            # model="gpt-4-turbo-preview",
+            messages=[
+                {"role": "system", "content": database_query_prompt},
+                {"role": "user", "content": prompt},
+            ],
+            max_tokens=4096,
+            temperature=1,
+            stream=True,
+        )
         
-    return result
+        for chunk in response:
+            current_content = chunk.choices[0].delta.content
+            message += f"{current_content if current_content else ''}"
+            
+        # Process the received message
+        result = enhanced_retrieval(message)
+        json_result = json.dumps(result, default=str)
+        
+        # Generate queries using the processed data
+        result_queries = generate_query(prompt, json_result)
+        
+        return result_queries
+    
+    except Exception as e:
+        print("OpenAI Response (Streaming) Error: " + str(e))
+        return ""
