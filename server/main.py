@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Any, List
 
-from utils.rag import enhanced_retrieval, generate_query, retrieval
+from utils.rag import enhanced_retrieval, generate_queries, retrieval
 from utils.data import data_store
 from datetime import datetime
 from fastapi.responses import StreamingResponse
@@ -211,21 +211,16 @@ async def memory_handler():
 
 class MessageRequest(BaseModel):
     prompt: str
-    context: List[dict[str, str]]
+    related_queries: str
+    context: str
     
     
 @app.post("/rag")
 async def rag(message_request: MessageRequest): 
     prompt = message_request.prompt
     context = message_request.context
-    
-    # response, citations = await RAG(prompt, context)
-    system_prompt = _rag_query_text.format(
-        context="\n\n".join(
-            [f"[[citation:{c['id']}]] Author: {c['author']}\n Title: {c['title']}\n Abstract: {c['text']}" for i, c in enumerate(context)]
-        )
-    )
-    
+    related_queries = message_request.related_queries
+
     async def response_stream():
         global messages_history
         
@@ -233,7 +228,7 @@ async def rag(message_request: MessageRequest):
             model="gpt-3.5-turbo",
             # model="gpt-4-turbo-preview",
             messages= messages_history + [
-                {"role": "system", "content": system_prompt},
+                {"role": "system", "content": "below are the related queries you can reference to answer the question: " + related_queries + context},
                 {"role": "user", "content": prompt},
             ],
             max_tokens=4096,
@@ -263,20 +258,29 @@ async def rag(message_request: MessageRequest):
     
     return StreamingResponse(response_stream(), media_type="text/event-stream")
 
-@app.post("/preprocess")
-async def preprocess(message_request: MessageRequest): 
-    prompt = message_request.prompt
+class QueryRequest(BaseModel):
+    prompt: str
+    context: List[dict[str, str]]
 
-    # Initialize the message variable
+@app.post("/preprocess")
+async def preprocess(query_request: QueryRequest): 
+    prompt = query_request.prompt
+    context = query_request.context
+
+    system_prompt = _rag_query_text.format(
+        context="\n\n".join(
+            [f"[[citation:{c['id']}]] Author: {c['author']}\n Title: {c['title']}\n Abstract: {c['text']}" for i, c in enumerate(context)]
+        )
+    )
+
     message = ""
 
     try:
-        # Get the streaming response from the OpenAI API
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             # model="gpt-4-turbo-preview",
             messages=[
-                {"role": "system", "content": database_query_prompt},
+                {"role": "system", "content": system_prompt + database_query_prompt},
                 {"role": "user", "content": prompt},
             ],
             max_tokens=4096,
@@ -287,15 +291,13 @@ async def preprocess(message_request: MessageRequest):
         for chunk in response:
             current_content = chunk.choices[0].delta.content
             message += f"{current_content if current_content else ''}"
-            
-        # Process the received message
+
+
         result = enhanced_retrieval(message)
-        json_result = json.dumps(result, default=str)
+        json_context = json.dumps(result, default=str)
+        result_queries = generate_queries(prompt, json_context)
         
-        # Generate queries using the processed data
-        result_queries = generate_query(prompt, json_result)
-        
-        return result_queries
+        return result_queries, json_context
     
     except Exception as e:
         print("OpenAI Response (Streaming) Error: " + str(e))

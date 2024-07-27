@@ -94,15 +94,17 @@
       };
     });
 
-   const relatedQueries =  await fetch("http://localhost:8000/preprocess", {
+   const response =  await fetch("http://localhost:8000/preprocess", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ prompt: query, context }),
+      body: JSON.stringify({ prompt: query, context}),
     });
 
-    
+    const data = await response.json();
+    const resultQueries = data[0];
+    const jsonResult = data[1];
 
     answer = "Synthesizing Information...";
     const res = await fetch("http://localhost:8000/rag", {
@@ -110,7 +112,7 @@
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ prompt: query, context }),
+      body: JSON.stringify({ prompt: query, context: jsonResult, related_queries: resultQueries }),
     });
 
     let result = "";

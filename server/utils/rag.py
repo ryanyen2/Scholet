@@ -1,4 +1,3 @@
-
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from fastapi import HTTPException
@@ -50,44 +49,22 @@ def generate_queries_chatgpt(original_query):
     return generated_queries
 
 
-def generate_query(original_query, context):
+def generate_queries(original_query, context):
     """
     Generate related questions based on the original question and the context.
     """
-    
-    def ask_related_questions(
-        queries: Annotated[
-            List[str],
-            [(
-                "query",
-                Annotated[
-                    str, "related query to the original query and context."
-                ],
-            )],
-        ]
-    ):
-        """
-        Ask related questions based on the original question and the context.
-        """
-        
-        pass
 
-    message = ""
     try:
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": context},
-                {"role": "user", "content": _rag_query_text.format(context=context) + original_query},
+                {"role": "user", "content": _generate_more_queries_prompt  + original_query},
             ],
-            # tools=[{
-            #     "type": "function",
-            #     "function": tool.get_tools_spec(ask_related_questions),
-            # }],
             max_tokens=512,
             stream=True,
         )
-
+        message = ""
         for chunk in response:
             current_content = chunk.choices[0].delta.content
             message += f"{current_content if current_content else ''}"
@@ -95,10 +72,8 @@ def generate_query(original_query, context):
         return message
 
     except Exception as e:
-        # For any exceptions, return None.
-        print(f"Encountered an error while generating related questions:\n{e}")
-        return None
-
+        print(f"encountered error while generating related questions:\n{e}")
+        return []
 
 def reciprocal_rank_fusion(search_results_dict, df, k=60):
     index_fused_scores = {}
