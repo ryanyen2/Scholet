@@ -212,7 +212,7 @@ async def memory_handler():
 class MessageRequest(BaseModel):
     prompt: str
     related_queries: str
-    context: str
+    context: List[dict[str, str]]
     
     
 @app.post("/rag")
@@ -221,6 +221,12 @@ async def rag(message_request: MessageRequest):
     context = message_request.context
     related_queries = message_request.related_queries
 
+    system_prompt = _rag_query_text.format(
+        context="\n\n".join(
+            [f"[[citation:{c['id']}]] Author: {c['author']}\n Title: {c['title']}\n Abstract: {c['text']}" for i, c in enumerate(context)]
+        )
+    )
+
     async def response_stream():
         global messages_history
         
@@ -228,7 +234,7 @@ async def rag(message_request: MessageRequest):
             model="gpt-3.5-turbo",
             # model="gpt-4-turbo-preview",
             messages= messages_history + [
-                {"role": "system", "content": "below are the related queries you can reference to answer the question: " + related_queries + context},
+                {"role": "system", "content":related_queries + system_prompt},
                 {"role": "user", "content": prompt},
             ],
             max_tokens=4096,

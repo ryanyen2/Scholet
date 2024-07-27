@@ -1,7 +1,7 @@
 <script lang="ts">
   import * as d3 from "d3";
   import { createEventDispatcher } from "svelte";
-  import type { RefereneceType, BinData, ScholarData, IEEEScholarData, IEEEData } from "../types/type.js";
+  import type { RefereneceType, BinData, IEEEScholarData} from "../types/type.js";
   import Citation from "./Citation.svelte";
 
   const dispatch = createEventDispatcher();
@@ -106,13 +106,25 @@
     const resultQueries = data[0];
     const jsonResult = data[1];
 
+    const jsonMap = JSON.parse(jsonResult);
+
+    context = jsonMap.map((ref: any) => {
+      return {
+        id: ref.paper_id,
+        author: ref.name,
+        title: ref.Title,
+        text: ref.Abstract,
+      };
+    });
+
+
     answer = "Synthesizing Information...";
     const res = await fetch("http://localhost:8000/rag", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ prompt: query, context: jsonResult, related_queries: resultQueries }),
+      body: JSON.stringify({ prompt: query, context: context, related_queries: resultQueries }),
     });
 
     let result = "";
@@ -220,6 +232,11 @@
   function handleCitationClick(e: CustomEvent<string>) {
     dispatch("citationClick", e.detail);
   }
+
+
+    function type(resultQueries: any): any {
+        throw new Error("Function not implemented.");
+    }
 </script>
 
 <div id="chat-panel">
