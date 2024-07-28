@@ -104,11 +104,9 @@
 
     const data = await response.json();
     const resultQueries = data[0];
-    const jsonResult = data[1];
+    references = JSON.parse(data[1])
 
-    const jsonMap = JSON.parse(jsonResult);
-
-    context = jsonMap.map((ref: any) => {
+    context = references.map((ref: any) => {
       return {
         id: ref.paper_id,
         author: ref.name,

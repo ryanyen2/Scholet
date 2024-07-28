@@ -283,8 +283,8 @@ async def preprocess(query_request: QueryRequest):
 
     try:
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            # model="gpt-4-turbo-preview",
+            # model="gpt-3.5-turbo",
+            model="gpt-4-turbo-preview",
             messages=[
                 {"role": "system", "content": system_prompt + database_query_prompt},
                 {"role": "user", "content": prompt},
