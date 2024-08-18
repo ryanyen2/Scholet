@@ -1,7 +1,7 @@
 <script lang="ts">
   import * as d3 from "d3";
   import { createEventDispatcher } from "svelte";
-  import type { RefereneceType, BinData, ScholarData, IEEEScholarData, IEEEData } from "../types/type.js";
+  import type { RefereneceType, BinData, IEEEScholarData} from "../types/type.js";
   import Citation from "./Citation.svelte";
 
   const dispatch = createEventDispatcher();
@@ -70,7 +70,6 @@
       queryWithSelected += " " + paperIds.map((id) => `[[P:${id}]]`).join(" ");
     }
 
-
     await fetch("http://localhost:8000/retrieval", {
       method: "POST",
       headers: {
@@ -86,8 +85,7 @@
 
     dispatch("retrievedReferences", references);
 
-    // context = [{id: "paper_id", text: "abstract"}]
-    const context = references.map((ref) => {
+    let context = references.map((ref) => {
       return {
         id: ref.paper_id,
         author: ref.name,
@@ -96,13 +94,35 @@
       };
     });
 
+   const response =  await fetch("http://localhost:8000/preprocess", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ prompt: query, context}),
+    });
+
+    const data = await response.json();
+    const resultQueries = data[0];
+    references = JSON.parse(data[1])
+
+    context = references.map((ref: any) => {
+      return {
+        id: ref.paper_id,
+        author: ref.name,
+        title: ref.Title,
+        text: ref.Abstract,
+      };
+    });
+
+
     answer = "Synthesizing Information...";
     const res = await fetch("http://localhost:8000/rag", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ prompt: query, context }),
+      body: JSON.stringify({ prompt: query, context: context, related_queries: resultQueries }),
     });
 
     let result = "";
@@ -210,6 +230,11 @@
   function handleCitationClick(e: CustomEvent<string>) {
     dispatch("citationClick", e.detail);
   }
+
+
+    function type(resultQueries: any): any {
+        throw new Error("Function not implemented.");
+    }
 </script>
 
 <div id="chat-panel">

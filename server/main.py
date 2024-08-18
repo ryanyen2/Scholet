@@ -1,12 +1,13 @@
 import json
 import numpy as np
+import re
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Any, List
 
-from utils.rag import retrieval
+from utils.rag import enhanced_retrieval, generate_queries, retrieval
 from utils.data import data_store
 from datetime import datetime
 from fastapi.responses import StreamingResponse
@@ -73,6 +74,60 @@ New lines of conversation:
 
 New summary:"""
 
+database_query_prompt = """You are an assistant that answers questions related to academic research topics.
+
+User Query: The user will ask a question related to academic research topics.
+
+If you need more information from the user, respond with a query like this:
+
+[[column_name]]: [["value1", "value2", ...]]
+
+Example:
+
+[[AuthorNames]]: [["John Doe", "Jane Smith"]]
+
+Note that the values in the query should be based on the user query and the database columns. The databse columns are:
+
+- Conference
+- Year
+- Title
+- DOI
+- Link
+- FirstPage
+- LastPage
+- PaperType
+- Abstract
+- AuthorNames-Deduped
+- AuthorNames
+- AuthorAffiliation
+- InternalReferences
+- AuthorKeywords
+- AminerCitationCount
+- CitationCount_CrossRef
+- PubsCited_CrossRef
+- Downloads_Xplore
+- Award
+- GraphicsReplicabilityStamp
+- embeddings
+- umap_x
+- umap_y
+- cluster
+- top_keywords
+
+Example User Query: "Find papers related to neural networks by John Doe."
+
+Example Output:
+
+[[AuthorNames]]: [["John Doe"]]
+[[Abstract]]: [["neural networks"]]
+
+Example User Query: "Find papers related to neural networks by John Doe."
+
+Example Output:
+
+[[AuthorNames]]: [["John Doe"]]
+[[Abstract]]: [["neural networks"]]
+"""
 
 class DataResponse(BaseModel):
     df: list[dict[str, Any]]
@@ -156,6 +211,7 @@ async def memory_handler():
 
 class MessageRequest(BaseModel):
     prompt: str
+    related_queries: str
     context: List[dict[str, str]]
     
     
@@ -163,22 +219,22 @@ class MessageRequest(BaseModel):
 async def rag(message_request: MessageRequest): 
     prompt = message_request.prompt
     context = message_request.context
-    
-    # response, citations = await RAG(prompt, context)
+    related_queries = message_request.related_queries
+
     system_prompt = _rag_query_text.format(
         context="\n\n".join(
             [f"[[citation:{c['id']}]] Author: {c['author']}\n Title: {c['title']}\n Abstract: {c['text']}" for i, c in enumerate(context)]
         )
     )
-    
+
     async def response_stream():
         global messages_history
         
         response = client.chat.completions.create(
-            # model="gpt-3.5-turbo",
-            model="gpt-4-turbo-preview",
+            model="gpt-3.5-turbo",
+            # model="gpt-4-turbo-preview",
             messages= messages_history + [
-                {"role": "system", "content": system_prompt},
+                {"role": "system", "content":related_queries + system_prompt},
                 {"role": "user", "content": prompt},
             ],
             max_tokens=4096,
@@ -207,3 +263,48 @@ async def rag(message_request: MessageRequest):
             print("OpenAI Response (Streaming) Error: " + str(e))
     
     return StreamingResponse(response_stream(), media_type="text/event-stream")
+
+class QueryRequest(BaseModel):
+    prompt: str
+    context: List[dict[str, str]]
+
+@app.post("/preprocess")
+async def preprocess(query_request: QueryRequest): 
+    prompt = query_request.prompt
+    context = query_request.context
+
+    system_prompt = _rag_query_text.format(
+        context="\n\n".join(
+            [f"[[citation:{c['id']}]] Author: {c['author']}\n Title: {c['title']}\n Abstract: {c['text']}" for i, c in enumerate(context)]
+        )
+    )
+
+    message = ""
+
+    try:
+        response = client.chat.completions.create(
+            # model="gpt-3.5-turbo",
+            model="gpt-4-turbo-preview",
+            messages=[
+                {"role": "system", "content": system_prompt + database_query_prompt},
+                {"role": "user", "content": prompt},
+            ],
+            max_tokens=4096,
+            temperature=1,
+            stream=True,
+        )
+        
+        for chunk in response:
+            current_content = chunk.choices[0].delta.content
+            message += f"{current_content if current_content else ''}"
+
+
+        result = enhanced_retrieval(message)
+        json_context = json.dumps(result, default=str)
+        result_queries = generate_queries(prompt, json_context)
+        
+        return result_queries, json_context
+    
+    except Exception as e:
+        print("OpenAI Response (Streaming) Error: " + str(e))
+        return ""

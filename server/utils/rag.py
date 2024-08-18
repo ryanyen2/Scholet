@@ -3,7 +3,7 @@ from sentence_transformers import SentenceTransformer
 from fastapi import HTTPException
 import re
 import json
-from typing import Annotated, List
+from typing import Annotated, List, get_type_hints
 
 from utils.client_setup import client
 from utils.data import data_store
@@ -49,61 +49,31 @@ def generate_queries_chatgpt(original_query):
     return generated_queries
 
 
-def generate_queries(original_query):
+def generate_queries(original_query, context):
     """
     Generate related questions based on the original question and the context.
     """
-    
-    def ask_related_questions(
-        queries: Annotated[
-            List[str],
-            [(
-                "query",
-                Annotated[
-                    str, "related query to the original query and context."
-                ],
-            )],
-        ]
-    ):
-        """
-        Ask related questions based on the original question and the context.
-        """
-        
-        pass
 
     try:
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {
-                    "role": "system",
-                    "content": _generate_more_queries_prompt
-                },
-                {
-                    "role": "user",
-                    "content": f"{original_query}",
-                },
+                {"role": "system", "content": context},
+                {"role": "user", "content": _generate_more_queries_prompt  + original_query},
             ],
-            tools=[{
-                "type": "function",
-                "function": tool.get_tools_spec(ask_related_questions),
-            }],
             max_tokens=512,
+            stream=True,
         )
-        
-        print(f"Generated related questions: {response.choices[0].message.tool_calls[0].function.arguments}")
-        related = response.choices[0].message.tool_calls[0].function.arguments
-        if isinstance(related, str):
-            related = json.loads(related)
-        
-        return related["queries"][:]
-    
+        message = ""
+        for chunk in response:
+            current_content = chunk.choices[0].delta.content
+            message += f"{current_content if current_content else ''}"
+            
+        return message
+
     except Exception as e:
-        # For any exceptions, we will just return an empty list.
         print(f"encountered error while generating related questions:\n{e}")
         return []
-
-
 
 def reciprocal_rank_fusion(search_results_dict, df, k=60):
     index_fused_scores = {}
@@ -246,3 +216,38 @@ async def RAG(prompt, context):
     citations_objects = [{'id': c['id'], 'content': c['text']} for c in context]
     
     return {"response": llm_response.choices[0].message.content, "citations": citations_objects}
+
+def parse_response(query):
+    itemPattern = re.compile(r'\d+\.\s*\[\[(.*?)\]\]:\s*\[\[(.*?)\]\]')
+    
+    values = itemPattern.findall(query)
+    
+    result = []
+    for match in values:
+        key = match[0]
+        values = [val.strip().strip('"') for val in match[1].split(',')]
+        result.append([key] + values)
+    
+    return result
+
+def filter_dataframe(df, conditions):
+    filtered_df = df.copy()
+    
+    for condition in conditions:
+        column_name = condition[0]
+        values_to_match = condition[1:]
+        
+        filtered_df = filtered_df[filtered_df[column_name].isin(values_to_match)]
+    
+    return filtered_df
+
+def enhanced_retrieval(query):
+    embeddings_df = data_store.get_data()
+    lst = parse_response(query)
+    filtered_df = filter_dataframe(embeddings_df, lst)
+    if len(filtered_df) == 0:
+        raise HTTPException(status_code=404, detail="No results found for the given query.")
+    matrix = np.array(filtered_df['embeddings'].tolist())
+    top_results = compute_fused_results(query, matrix, filtered_df, generate_queries=False)
+    
+    return top_results
