@@ -1,0 +1,8 @@
+fastapi
+numpy
+pydantic
+nltk
+openai
+dotenv
+langchain
+sentence-transformers

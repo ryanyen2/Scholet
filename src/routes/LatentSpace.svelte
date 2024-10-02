@@ -253,7 +253,13 @@
           )
           .attr("fill", "#2C3E50")
           .style("font-size", "12px")
-          .style("fill-opacity", 0);
+          .style("fill-opacity", 0.3)
+          .on("mouseover", function () {
+            d3.select(this).style("fill-opacity", 1);
+          })
+          .on("mouseleave", function () {
+            d3.select(this).style("fill-opacity", 0.3);
+          });
 
         d3.select(that)
           .append("rect")
@@ -262,11 +268,11 @@
           .attr("width", 10)
           .attr("height", 10)
           .attr("fill", clusterColor(d.cluster.toString()))
-          .on("click", function () {
-            const currentOpacity = text.style("fill-opacity");
-            const newOpacity = currentOpacity === "0" ? "0.6" : "0";
-            text.transition().duration(500).style("fill-opacity", newOpacity);
-          })
+          // .on("click", function () {
+          //   const currentOpacity = text.style("fill-opacity");
+          //   const newOpacity = currentOpacity === "0" ? "0.6" : "0";
+          //   text.transition().duration(500).style("fill-opacity", newOpacity);
+          // })
           .on("mouseover", function () {
             d3.select(this).style("fill-opacity", 1);
           })
@@ -461,6 +467,9 @@
             // for (const title of groupedData[name].titles) {
             //   count += (title.match(new RegExp(query, "g")) || []).length;
             // }
+            if (query.length < 3) {
+              continue;
+            }
 
             for (const abstract of groupedData[name].abstracts) {
               const count = (abstract.match(new RegExp(query, "g")) || [])
@@ -482,7 +491,7 @@
             for (const abstract of groupedData[name].abstracts) {
               const count = (abstract.match(new RegExp(query, "g")) || []).length;
               const width = ((count - minCount) / (maxCount - minCount)) * 100;
-              console.log(query, width, count, minCount, maxCount);
+              // console.log(query, width, count, minCount, maxCount);
               tableHtml += `<tr style="background: linear-gradient(to left, #3498db66 ${width / 2}%, transparent 0);"><td>${abstract.slice(0, 100)}...</td></tr>`;
             }
             tableHtml += "</table></td></tr><tr><td colspan='2'><hr></td></tr>"; // Add horizontal line
@@ -538,7 +547,7 @@
               maxCount = Math.max(maxCount, count);
             }
           }
-          console.log(query, minCount, maxCount);
+          // console.log(query, minCount, maxCount);
           let tableHtml = "<table style='width: 100%; font-size: 10px;'>";
 
           // for (const [name, publications] of titles) {
@@ -828,35 +837,40 @@
       .then((data) => {
         data = JSON.parse(data);
         // highlight the matching bins
-        // d3.selectAll(".rectBin").style("fill-opacity", 0.05);
-        // d3.selectAll(".rectBin")
-        //   .transition()
-        //   .duration(500)
-        //   .filter((d: any) => {
-        //     return matchingBins.includes(d);
-        //   })
-        //   .style("fill-opacity", 1);
+        const paperIds = data.map((d: any) => d.paper_id);
+        
+        const matchingBins = binData.filter((bin: BinData) => {
+          return bin.data.some((item: any) => {
+            if (item.paper_id) {
+              return paperIds.includes(item.paper_id.toString());
+            }
+            return false;
+          });
+        });
 
-        // // also highlight the long-term-bin-keywords and bin-emoji
-        // d3.selectAll(".bin-emoji").style("fill-opacity", 0.05);
-        // d3.selectAll(".bin-emoji")
-        //   .transition()
-        //   .duration(500)
-        //   .filter((d: any) => {
-        //     return matchingBins.includes(d);
-        //   })
-        //   .style("fill-opacity", 1);
-
-        // d3.selectAll(".long-term-bin-keywords").attr("style", "opacity: 0.01");
-        // d3.selectAll(".long-term-bin-keywords")
-        //   .transition()
-        //   .duration(500)
-        //   .filter((d: any) => {
-        //     return matchingBins.includes(d);
-        //   })
-        //   .attr("style", "opacity: 1");
+        d3.selectAll(".rectBin").style("fill-opacity", 0.05);
+        d3.selectAll(".rectBin")
+          .transition()
+          .duration(500)
+          .filter((d: any) => {
+            return matchingBins.includes(d);
+          })
+          .style("fill-opacity", 1);
       });
   };
+
+  const handleYearChange = async () => {
+    // filter papers that within the minYear and maxYear
+    const matchedData = ieeeData.filter((d: IEEEData) => {
+      return d.Year >= minYear && d.Year <= maxYear;
+    });
+
+    binData = constructBinData(matchedData);
+    scholarData = getScholarData(binData) as IEEEScholarData[];
+    let scholarBinData = constructScholarBinData(scholarData);
+    binData = adjustBins(binData, scholarBinData, width, height, 50);
+    redraw();
+  }
 
   const handleKeywordSearch = async () => {
     const query = searchTerm.trim().toLowerCase();
@@ -868,7 +882,7 @@
       return;
     }
 
-    if (query.length > 3) {
+    if (query.length > 3 && query.length < 12) {
       if (scholarView) {
         // remove scholarView
         const matchingScholars = scholarData.filter(
@@ -923,6 +937,10 @@
           })
           .style("fill-opacity", 1);
       }
+    } else if (query.length >= 12) {
+      // do semantic retrieval
+      d3.selectAll(".rectBin").style("fill-opacity", .85);
+      handleSemanticRetrieval();
     }
   };
 
@@ -1053,12 +1071,12 @@
 
   if (browser) {
     onMount(async () => {
-      console.log(
-        longTermVis.clientWidth,
-        longTermVis.clientHeight,
-        width,
-        height
-      );
+      // console.log(
+      //   longTermVis.clientWidth,
+      //   longTermVis.clientHeight,
+      //   width,
+      //   height
+      // );
       width = longTermVis.clientWidth;
       await loadData();
     });
@@ -1070,6 +1088,10 @@
 
   $: if (browser && binData && binData.length > 0)
     binsNum, handleBinsNumChange();
+
+  $: if (browser && binData && binData.length > 0)
+    minYear, maxYear, handleYearChange();
+  
 </script>
 
 <div>
