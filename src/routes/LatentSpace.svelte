@@ -72,6 +72,7 @@
     ]) as any;
 
   let longTermVis: HTMLDivElement;
+  let yearChangeTimeout = null as any;
 
   function constructBinData(data: IEEEData[]): BinData[] {
     const binsMap = new Map<string, BinData>();
@@ -489,7 +490,8 @@
             //   tableHtml += `<tr style="background: linear-gradient(to left, #3498db ${width / 2}%, transparent 0.6);"><td>${title}</td></tr>`;
             // }
             for (const abstract of groupedData[name].abstracts) {
-              const count = (abstract.match(new RegExp(query, "g")) || []).length;
+              const count = (abstract.match(new RegExp(query, "g")) || [])
+                .length;
               const width = ((count - minCount) / (maxCount - minCount)) * 100;
               // console.log(query, width, count, minCount, maxCount);
               tableHtml += `<tr style="background: linear-gradient(to left, #3498db66 ${width / 2}%, transparent 0);"><td>${abstract.slice(0, 100)}...</td></tr>`;
@@ -838,7 +840,7 @@
         data = JSON.parse(data);
         // highlight the matching bins
         const paperIds = data.map((d: any) => d.paper_id);
-        
+
         const matchingBins = binData.filter((bin: BinData) => {
           return bin.data.some((item: any) => {
             if (item.paper_id) {
@@ -870,7 +872,7 @@
     let scholarBinData = constructScholarBinData(scholarData);
     binData = adjustBins(binData, scholarBinData, width, height, 50);
     redraw();
-  }
+  };
 
   const handleKeywordSearch = async () => {
     const query = searchTerm.trim().toLowerCase();
@@ -939,7 +941,7 @@
       }
     } else if (query.length >= 12) {
       // do semantic retrieval
-      d3.selectAll(".rectBin").style("fill-opacity", .85);
+      d3.selectAll(".rectBin").style("fill-opacity", 0.85);
       handleSemanticRetrieval();
     }
   };
@@ -1092,6 +1094,15 @@
   $: if (browser && binData && binData.length > 0)
     minYear, maxYear, handleYearChange();
   
+  // const delayedRedraw = () => {
+  //   clearTimeout(yearChangeTimeout);
+  //   yearChangeTimeout = setTimeout(handleYearChange, 1000);
+  // };
+
+  // $: if (browser && binData && binData.length > 0) {
+  //   delayedRedraw();
+  // }
+
 </script>
 
 <div>

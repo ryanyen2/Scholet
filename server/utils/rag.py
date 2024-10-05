@@ -5,8 +5,9 @@ import re
 import json
 from typing import Annotated, List, get_type_hints
 
-from utils.client_setup import client
+# from utils.client_setup import client
 from utils.data import data_store
+
 
 from langchain.text_splitter import NLTKTextSplitter
 text_splitter = NLTKTextSplitter(chunk_size=250)
@@ -35,21 +36,21 @@ And here is the user query, generate 4 to 6 related queries based on this query:
 """
 
 
-def generate_queries_chatgpt(original_query):
+# def generate_queries_chatgpt(original_query):
 
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": _generate_more_queries_prompt},
-            {"role": "user", "content": f"{original_query}"},
-        ]
-    )
+#     response = client.chat.completions.create(
+#         model="gpt-3.5-turbo",
+#         messages=[
+#             {"role": "system", "content": _generate_more_queries_prompt},
+#             {"role": "user", "content": f"{original_query}"},
+#         ]
+#     )
 
-    generated_queries = response.choices[0].message.content
-    return generated_queries
+#     generated_queries = response.choices[0].message.content
+#     return generated_queries
 
 
-def generate_queries(original_query, context):
+def generate_queries(original_query, context, client):
     """
     Generate related questions based on the original question and the context.
     """
@@ -194,28 +195,28 @@ def retrieval(query):
     return top_results
     
     
-async def RAG(prompt, context):
-    system_prompt = _rag_query_text.format(
-        context="\n\n".join(
-            [f"[[citation:{c['id']}]] {c['text']}" for i, c in enumerate(context)]
-        )
-    )
+# async def RAG(prompt, context):
+#     system_prompt = _rag_query_text.format(
+#         context="\n\n".join(
+#             [f"[[citation:{c['id']}]] {c['text']}" for i, c in enumerate(context)]
+#         )
+#     )
     
-    llm_response = await client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt},
-        ],
-        max_tokens=2048,
-        # stop=stop_words,
-        # stream=True,
-        temperature=0.9,
-    )
-    # list all the citations
-    citations_objects = [{'id': c['id'], 'content': c['text']} for c in context]
+#     llm_response = await client.chat.completions.create(
+#         model="gpt-3.5-turbo",
+#         messages=[
+#             {"role": "system", "content": system_prompt},
+#             {"role": "user", "content": prompt},
+#         ],
+#         max_tokens=2048,
+#         # stop=stop_words,
+#         # stream=True,
+#         temperature=0.9,
+#     )
+#     # list all the citations
+#     citations_objects = [{'id': c['id'], 'content': c['text']} for c in context]
     
-    return {"response": llm_response.choices[0].message.content, "citations": citations_objects}
+#     return {"response": llm_response.choices[0].message.content, "citations": citations_objects}
 
 def parse_response(query):
     itemPattern = re.compile(r'\d+\.\s*\[\[(.*?)\]\]:\s*\[\[(.*?)\]\]')

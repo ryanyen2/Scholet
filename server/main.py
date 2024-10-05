@@ -12,10 +12,11 @@ from utils.data import data_store
 from datetime import datetime
 from fastapi.responses import StreamingResponse
 
+from openai import OpenAI
 import nltk
 nltk.download('punkt')
 import asyncio
-from utils.client_setup import client
+# from utils.client_setup import client
 
 
 app = FastAPI()
@@ -129,6 +130,24 @@ Example Output:
 [[Abstract]]: [["neural networks"]]
 """
 
+
+client = None  # OpenAI client
+
+class APIKey(BaseModel):
+    key: str
+
+# Endpoint to store the OpenAI API key
+@app.post("/apikey")
+async def store_api_key(api_key: APIKey):
+    global client  # Declare client as global to modify the global variable
+    try:
+        # Store the API key (for production, you should encrypt and store it securely)
+        client = OpenAI(api_key=api_key.key)
+        return {"message": "API key stored successfully"}
+    except Exception as e:
+        print("Error storing API key:", str(e))
+        return {"error": "Failed to store API key"}
+
 class DataResponse(BaseModel):
     df: list[dict[str, Any]]
     date: str
@@ -182,6 +201,7 @@ async def clear_memory():
 
 async def memory_handler():
     global messages_history
+    global client
     
     if len(messages_history) < 5:
         return
@@ -229,6 +249,7 @@ async def rag(message_request: MessageRequest):
 
     async def response_stream():
         global messages_history
+        global client
         
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
@@ -270,6 +291,7 @@ class QueryRequest(BaseModel):
 
 @app.post("/preprocess")
 async def preprocess(query_request: QueryRequest): 
+    global client
     prompt = query_request.prompt
     context = query_request.context
 
@@ -301,7 +323,7 @@ async def preprocess(query_request: QueryRequest):
 
         result = enhanced_retrieval(message)
         json_context = json.dumps(result, default=str)
-        result_queries = generate_queries(prompt, json_context)
+        result_queries = generate_queries(prompt, json_context, client)
         
         return result_queries, json_context
     
